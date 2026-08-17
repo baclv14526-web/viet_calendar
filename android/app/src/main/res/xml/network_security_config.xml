@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Android 9 (API 28) chặn HTTP cleartext mặc định -->
+    <!-- Google Fonts dùng HTTPS nên an toàn, chỉ cho phép domain cụ thể -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">fonts.googleapis.com</domain>
+        <domain includeSubdomains="true">fonts.gstatic.com</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

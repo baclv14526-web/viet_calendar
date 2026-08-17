@@ -107,9 +107,11 @@ class VietCalendarApp extends StatelessWidget {
         elevation: 0,
         centerTitle: false,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: const CardTheme(
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
@@ -131,9 +133,11 @@ class VietCalendarApp extends StatelessWidget {
         brightness: Brightness.dark,
       ),
       textTheme: GoogleFonts.notoSansTextTheme(ThemeData.dark().textTheme),
-      cardTheme: CardThemeData(
+      cardTheme: const CardTheme(
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
       ),
     );
   }

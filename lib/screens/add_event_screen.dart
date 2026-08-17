@@ -75,8 +75,6 @@ class _AddEventScreenState extends State<AddEventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Sửa sự kiện' : 'Sự kiện mới'),

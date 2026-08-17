@@ -4,7 +4,6 @@ import '../models/calendar_event.dart';
 import '../services/database_service.dart';
 import '../services/notification_service.dart';
 import '../utils/vietnamese_holidays.dart';
-import '../utils/lunar_converter.dart';
 
 // ============ EVENTS ============
 abstract class CalendarBlocEvent extends Equatable {

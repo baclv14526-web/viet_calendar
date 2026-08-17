@@ -83,6 +83,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Gửi thông báo thử nghiệm ngay bây giờ'),
             trailing: const Icon(Icons.send),
             onTap: () async {
+              // Lưu messenger trước async gap để tránh lỗi BuildContext
+              final messenger = ScaffoldMessenger.of(context);
               await NotificationServiceProvider.of(context)
                   .service
                   .showInstantNotification(
@@ -91,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: theme.colorScheme.primary,
                   );
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(
                       content: Text('✅ Đã gửi thông báo thử!')),
                 );

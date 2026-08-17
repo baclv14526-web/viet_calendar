@@ -7,10 +7,9 @@ import 'dart:io';
 import '../models/calendar_event.dart';
 
 // Android API level constants
-const int _androidPie = 28;        // Android 9
-const int _androidQ = 29;          // Android 10
-const int _androidS = 31;          // Android 12 - SCHEDULE_EXACT_ALARM
-const int _androidT = 33;          // Android 13 - POST_NOTIFICATIONS runtime
+const int _androidQ = 29;   // Android 10 - fullScreenIntent
+const int _androidS = 31;   // Android 12 - SCHEDULE_EXACT_ALARM
+const int _androidT = 33;   // Android 13 - POST_NOTIFICATIONS runtime
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();

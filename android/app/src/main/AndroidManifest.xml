@@ -1,39 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Quyền thông báo - tương thích Android 9+ (API 28+) -->
+    <!-- Thông báo: Android 9-12 tự động granted, Android 13+ cần xin runtime -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- POST_NOTIFICATIONS chỉ cần trên Android 13+ (API 33+) -->
-    <!-- Trên Android 9-12 thông báo KHÔNG cần xin quyền runtime -->
+    <!-- Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
         android:minSdkVersion="33"/>
 
-    <!-- SCHEDULE_EXACT_ALARM: Android 12+ (API 31+) -->
-    <!-- Android 9-11 dùng AlarmManager mặc định, không cần permission này -->
+    <!-- Android 12+ (API 31+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:minSdkVersion="31"/>
-
-    <!-- USE_EXACT_ALARM: Android 13+ (API 33+) - thay thế SCHEDULE_EXACT_ALARM -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"
         android:minSdkVersion="33"/>
-
-    <!-- WAKE_LOCK: đảm bảo thông báo kích hoạt được màn hình (Android 9 cần) -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-
-    <!-- FOREGROUND_SERVICE: Android 9+ cần khai báo tường minh -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-
-    <!-- Internet (cho Google Fonts) -->
-    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="Lịch Việt"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true"
-        android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
@@ -52,14 +40,9 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Handle notification tap -->
-            <intent-filter>
-                <action android:name="FLUTTER_NOTIFICATION_CLICK"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-            </intent-filter>
         </activity>
 
-        <!-- Nhận boot broadcast để khôi phục thông báo -->
+        <!-- Khôi phục thông báo sau khi restart máy -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false">
@@ -71,7 +54,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Alarm receiver cho exact notifications -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
@@ -80,11 +62,4 @@
             android:name="flutterEmbedding"
             android:value="2"/>
     </application>
-
-    <!-- Android 12+ exact alarm queries -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.VIEW"/>
-        </intent>
-    </queries>
 </manifest>

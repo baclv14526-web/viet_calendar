@@ -16,11 +16,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const CalendarScreen(),
-    const AgendaScreen(),
-    const HolidaysScreen(),
-    const SettingsScreen(),
+  final List<Widget> _screens = const [
+    CalendarScreen(),
+    AgendaScreen(),
+    HolidaysScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -31,17 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        backgroundColor: theme.colorScheme.surface,
         elevation: 8,
         destinations: const [
           NavigationDestination(

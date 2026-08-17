@@ -7,7 +7,9 @@ import '../services/calendar_bloc.dart';
 import '../models/calendar_event.dart';
 import '../utils/lunar_converter.dart';
 import '../widgets/event_card.dart';
+import '../widgets/event_detail_sheet.dart';
 import '../widgets/lunar_info_widget.dart';
+import '../widgets/notification_provider.dart';
 import 'add_event_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -19,25 +21,10 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen>
     with TickerProviderStateMixin {
-  late AnimationController _fabController;
-  CalendarFormat _calendarFormat = CalendarFormat.month;
-
   @override
   void initState() {
     super.initState();
-    _fabController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    final bloc = context.read<CalendarBloc>();
-    bloc.add(LoadCalendarEvents(DateTime.now()));
-  }
-
-  @override
-  void dispose() {
-    _fabController.dispose();
-    super.dispose();
+    context.read<CalendarBloc>().add(LoadCalendarEvents(DateTime.now()));
   }
 
   @override
@@ -49,22 +36,27 @@ class _CalendarScreenState extends State<CalendarScreen>
           return CustomScrollView(
             slivers: [
               _buildSliverAppBar(context, state),
+              SliverToBoxAdapter(child: _buildCalendar(context, state)),
               SliverToBoxAdapter(
-                child: _buildCalendar(context, state),
-              ),
+                  child: LunarInfoWidget(date: state.selectedDate)),
               SliverToBoxAdapter(
-                child: LunarInfoWidget(date: state.selectedDate),
-              ),
-              SliverToBoxAdapter(
-                child: _buildEventListHeader(context, state),
-              ),
+                  child: _buildEventListHeader(context, state)),
               _buildEventList(context, state),
               const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
             ],
           );
         },
       ),
-      floatingActionButton: _buildFAB(context),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _navigateToAddEvent(
+          context,
+          context.read<CalendarBloc>().state.selectedDate,
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Sự kiện'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+      ),
     );
   }
 
@@ -77,7 +69,8 @@ class _CalendarScreenState extends State<CalendarScreen>
       elevation: 0,
       backgroundColor: theme.colorScheme.primary,
       flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        titlePadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         title: Row(
           children: [
             const Icon(Icons.calendar_today, color: Colors.white, size: 20),
@@ -89,17 +82,14 @@ class _CalendarScreenState extends State<CalendarScreen>
                 const Text(
                   'Lịch Việt',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  DateFormat('MMMM yyyy', 'vi_VN').format(state.focusedMonth),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
+                  DateFormat('MMMM yyyy', 'vi_VN')
+                      .format(state.focusedMonth),
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
             ),
@@ -110,15 +100,13 @@ class _CalendarScreenState extends State<CalendarScreen>
         IconButton(
           icon: const Icon(Icons.today, color: Colors.white),
           tooltip: 'Hôm nay',
-          onPressed: () {
-            context.read<CalendarBloc>().add(SelectDate(DateTime.now()));
-          },
+          onPressed: () =>
+              context.read<CalendarBloc>().add(SelectDate(DateTime.now())),
         ),
         PopupMenuButton<CalendarViewMode>(
           icon: const Icon(Icons.view_agenda_outlined, color: Colors.white),
-          onSelected: (mode) {
-            context.read<CalendarBloc>().add(ChangeViewMode(mode));
-          },
+          onSelected: (mode) =>
+              context.read<CalendarBloc>().add(ChangeViewMode(mode)),
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: CalendarViewMode.month,
@@ -140,7 +128,7 @@ class _CalendarScreenState extends State<CalendarScreen>
         ),
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () => _showNotificationSettings(context),
+          onPressed: () => _showNotificationTest(context),
         ),
       ],
     );
@@ -148,7 +136,6 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Widget _buildCalendar(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
-
     return Card(
       margin: const EdgeInsets.all(8),
       elevation: 2,
@@ -166,12 +153,10 @@ class _CalendarScreenState extends State<CalendarScreen>
           final key = DateTime(day.year, day.month, day.day);
           return state.events[key] ?? [];
         },
-        onDaySelected: (selectedDay, focusedDay) {
-          context.read<CalendarBloc>().add(SelectDate(selectedDay));
-        },
-        onPageChanged: (focusedDay) {
-          context.read<CalendarBloc>().add(LoadCalendarEvents(focusedDay));
-        },
+        onDaySelected: (selectedDay, focusedDay) =>
+            context.read<CalendarBloc>().add(SelectDate(selectedDay)),
+        onPageChanged: (focusedDay) =>
+            context.read<CalendarBloc>().add(LoadCalendarEvents(focusedDay)),
         calendarStyle: CalendarStyle(
           outsideDaysVisible: false,
           todayDecoration: BoxDecoration(
@@ -183,13 +168,9 @@ class _CalendarScreenState extends State<CalendarScreen>
             shape: BoxShape.circle,
           ),
           todayTextStyle: TextStyle(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.bold,
-          ),
-          selectedTextStyle: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+              color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+          selectedTextStyle:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           weekendTextStyle: const TextStyle(color: Color(0xFFE53935)),
           markerDecoration: BoxDecoration(
             color: theme.colorScheme.secondary,
@@ -200,11 +181,11 @@ class _CalendarScreenState extends State<CalendarScreen>
           cellMargin: const EdgeInsets.all(4),
         ),
         calendarBuilders: CalendarBuilders(
-          defaultBuilder: (context, day, focusedDay) =>
+          defaultBuilder: (context, day, _) =>
               _buildDayCell(context, day, state, false),
-          todayBuilder: (context, day, focusedDay) =>
+          todayBuilder: (context, day, _) =>
               _buildDayCell(context, day, state, false, isToday: true),
-          selectedBuilder: (context, day, focusedDay) =>
+          selectedBuilder: (context, day, _) =>
               _buildDayCell(context, day, state, true),
           markerBuilder: (context, day, events) {
             if (events.isEmpty) return const SizedBox.shrink();
@@ -215,10 +196,9 @@ class _CalendarScreenState extends State<CalendarScreen>
           formatButtonVisible: false,
           titleCentered: true,
           titleTextStyle: TextStyle(
-            color: theme.colorScheme.onSurface,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+              color: theme.colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold),
           leftChevronIcon:
               Icon(Icons.chevron_left, color: theme.colorScheme.primary),
           rightChevronIcon:
@@ -226,15 +206,13 @@ class _CalendarScreenState extends State<CalendarScreen>
         ),
         daysOfWeekStyle: DaysOfWeekStyle(
           weekdayStyle: TextStyle(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              fontSize: 12,
+              fontWeight: FontWeight.w600),
           weekendStyle: const TextStyle(
-            color: Color(0xFFE53935),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
+              color: Color(0xFFE53935),
+              fontSize: 12,
+              fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -249,17 +227,16 @@ class _CalendarScreenState extends State<CalendarScreen>
   }) {
     final theme = Theme.of(context);
     final lunar = LunarConverter.solarToLunar(day);
-    final isWeekend = day.weekday == DateTime.saturday ||
-        day.weekday == DateTime.sunday;
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
     final dayKey = DateTime(day.year, day.month, day.day);
     final dayEvents = state.events[dayKey] ?? [];
-    final hasHoliday = dayEvents
-        .any((e) => e.type == EventType.holiday || e.type == EventType.lunarHoliday);
+    final hasHoliday = dayEvents.any((e) =>
+        e.type == EventType.holiday || e.type == EventType.lunarHoliday);
 
     Color textColor = isWeekend || hasHoliday
         ? const Color(0xFFE53935)
         : theme.colorScheme.onSurface;
-
     if (isSelected) textColor = Colors.white;
 
     return Container(
@@ -280,12 +257,15 @@ class _CalendarScreenState extends State<CalendarScreen>
             style: TextStyle(
               color: textColor,
               fontSize: 14,
-              fontWeight:
-                  isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isToday || isSelected
+                  ? FontWeight.bold
+                  : FontWeight.normal,
             ),
           ),
           Text(
-            lunar.day == 1 ? '${lunar.day}/${lunar.month}' : '${lunar.day}',
+            lunar.day == 1
+                ? '${lunar.day}/${lunar.month}'
+                : '${lunar.day}',
             style: TextStyle(
               color: isSelected
                   ? Colors.white70
@@ -299,13 +279,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   Widget _buildEventMarkers(List<CalendarEvent> events) {
-    final colors = events
-        .take(3)
-        .map((e) => e.color)
-        .toSet()
-        .take(3)
-        .toList();
-
+    final colors = events.take(3).map((e) => e.color).toSet().take(3).toList();
     return Positioned(
       bottom: 1,
       child: Row(
@@ -315,10 +289,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                   width: 5,
                   height: 5,
                   margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                  decoration: BoxDecoration(
-                    color: c,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration:
+                      BoxDecoration(color: c, shape: BoxShape.circle),
                 ))
             .toList(),
       ),
@@ -327,9 +299,9 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Widget _buildEventListHeader(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
-    final dateStr = DateFormat('EEEE, d MMMM', 'vi_VN').format(state.selectedDate);
+    final dateStr =
+        DateFormat('EEEE, d MMMM', 'vi_VN').format(state.selectedDate);
     final count = state.selectedDateEvents.length;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
@@ -344,22 +316,15 @@ class _CalendarScreenState extends State<CalendarScreen>
           const SizedBox(width: 8),
           if (count > 0)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                '$count',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-          const Spacer(),
-          if (state.selectedDateEvents.isEmpty)
-            TextButton.icon(
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Thêm sự kiện'),
-              onPressed: () => _navigateToAddEvent(context, state.selectedDate),
+              child: Text('$count',
+                  style:
+                      const TextStyle(color: Colors.white, fontSize: 12)),
             ),
         ],
       ),
@@ -369,16 +334,11 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget _buildEventList(BuildContext context, CalendarState state) {
     if (state.isLoading) {
       return const SliverToBoxAdapter(
-        child: Center(child: CircularProgressIndicator()),
-      );
+          child: Center(child: CircularProgressIndicator()));
     }
-
     if (state.selectedDateEvents.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState(context),
-      );
+      return SliverToBoxAdapter(child: _buildEmptyState(context, state));
     }
-
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
@@ -408,55 +368,33 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, CalendarState state) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          Icon(
-            Icons.event_available,
-            size: 64,
-            color: Theme.of(context).colorScheme.outline,
-          ),
+          Icon(Icons.event_available,
+              size: 64, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 12),
-          Text(
-            'Không có sự kiện nào',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.outline,
-              fontSize: 16,
-            ),
-          ),
+          Text('Không có sự kiện nào',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.outline, fontSize: 16)),
           const SizedBox(height: 8),
           TextButton.icon(
             icon: const Icon(Icons.add_circle_outline),
             label: const Text('Tạo sự kiện mới'),
             onPressed: () =>
-                _navigateToAddEvent(context, context.read<CalendarBloc>().state.selectedDate),
+                _navigateToAddEvent(context, state.selectedDate),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFAB(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () => _navigateToAddEvent(
-        context,
-        context.read<CalendarBloc>().state.selectedDate,
-      ),
-      icon: const Icon(Icons.add),
-      label: const Text('Sự kiện'),
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      foregroundColor: Colors.white,
-    );
-  }
-
   void _navigateToAddEvent(BuildContext context, DateTime date) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddEventScreen(initialDate: date),
-      ),
+      MaterialPageRoute(builder: (_) => AddEventScreen(initialDate: date)),
     ).then((_) {
       if (context.mounted) {
         context.read<CalendarBloc>().add(LoadCalendarEvents(date));
@@ -468,13 +406,11 @@ class _CalendarScreenState extends State<CalendarScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AddEventScreen(initialDate: event.date, event: event),
-      ),
+          builder: (_) =>
+              AddEventScreen(initialDate: event.date, event: event)),
     ).then((_) {
       if (context.mounted) {
-        context.read<CalendarBloc>().add(
-              LoadCalendarEvents(event.date),
-            );
+        context.read<CalendarBloc>().add(LoadCalendarEvents(event.date));
       }
     });
   }
@@ -487,9 +423,8 @@ class _CalendarScreenState extends State<CalendarScreen>
         content: Text('Bạn có chắc muốn xóa "${event.title}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy'),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
@@ -508,165 +443,39 @@ class _CalendarScreenState extends State<CalendarScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _EventDetailSheet(event: event),
+      builder: (ctx) => EventDetailSheet(event: event),
     );
   }
 
-  void _showNotificationSettings(BuildContext context) {
+  void _showNotificationTest(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Row(children: [
           Icon(Icons.notifications, color: Colors.blue),
           SizedBox(width: 8),
-          Text('Thông báo'),
+          Text('Test thông báo'),
         ]),
         content: const Text(
-          'Ứng dụng sẽ gửi thông báo nhắc nhở các sự kiện của bạn và các ngày lễ Việt Nam.',
-        ),
+            'Gửi thông báo thử nghiệm ngay bây giờ để kiểm tra hệ thống.'),
         actions: [
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Test notification
-              await context.read<NotificationServiceProvider>()
+              await NotificationServiceProvider.of(context)
                   .service
                   .showInstantNotification(
-                    title: '🧧 Thông báo thử nghiệm',
-                    body: 'Hệ thống thông báo hoạt động tốt!',
+                    title: '🧧 Lịch Việt - Test',
+                    body: 'Thông báo hoạt động bình thường! 🎉',
                   );
             },
-            child: const Text('Test thông báo'),
+            child: const Text('Gửi test'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng'),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng')),
         ],
       ),
     );
-  }
-}
-
-// Provider để truy cập NotificationService
-class NotificationServiceProvider extends InheritedWidget {
-  final NotificationService service;
-
-  const NotificationServiceProvider({
-    super.key,
-    required this.service,
-    required super.child,
-  });
-
-  static NotificationServiceProvider of(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<NotificationServiceProvider>()!;
-  }
-
-  @override
-  bool updateShouldNotify(NotificationServiceProvider oldWidget) => false;
-}
-
-// ============ Event Detail Sheet ============
-class _EventDetailSheet extends StatelessWidget {
-  final CalendarEvent event;
-
-  const _EventDetailSheet({required this.event});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: event.color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    event.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const Divider(),
-            _infoRow(Icons.calendar_today, 'Ngày',
-                DateFormat('EEEE, d/M/yyyy', 'vi_VN').format(event.date)),
-            if (event.startTime != null)
-              _infoRow(Icons.access_time, 'Giờ',
-                  '${event.startTime!.format(context)}${event.endTime != null ? ' - ${event.endTime!.format(context)}' : ''}'),
-            if (event.description?.isNotEmpty == true)
-              _infoRow(Icons.notes, 'Ghi chú', event.description!),
-            _infoRow(
-              Icons.label,
-              'Loại',
-              _getTypeName(event.type),
-            ),
-            if (event.hasNotification)
-              _infoRow(
-                Icons.notifications_active,
-                'Nhắc nhở',
-                '${event.notificationMinutesBefore} phút trước',
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              Text(value, style: const TextStyle(fontSize: 15)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getTypeName(EventType type) {
-    return switch (type) {
-      EventType.personal => 'Cá nhân',
-      EventType.holiday => 'Ngày lễ quốc gia',
-      EventType.lunarHoliday => 'Ngày lễ âm lịch',
-      EventType.reminder => 'Nhắc nhở',
-    };
   }
 }

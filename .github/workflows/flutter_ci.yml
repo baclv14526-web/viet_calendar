@@ -16,9 +16,7 @@ on:
         options:
           - debug
           - release
-          - profile
 
-# Tránh chạy nhiều workflow song song trên cùng branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -46,12 +44,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-          cache-key: 'flutter-${{ env.FLUTTER_VERSION }}-${{ runner.os }}'
 
       - name: 📦 Get dependencies
         run: flutter pub get
 
-      - name: 🔍 Analyze code (Flutter Lints)
+      - name: 🔍 Analyze code
         run: flutter analyze --no-fatal-warnings
 
       - name: 📐 Check formatting
@@ -93,7 +90,7 @@ jobs:
           fail_ci_if_error: false
 
   # ============================================================
-  # JOB 3: BUILD ANDROID APK (DEBUG)
+  # JOB 3: BUILD ANDROID DEBUG APK
   # ============================================================
   build_android_debug:
     name: 🤖 Android Debug APK
@@ -123,7 +120,7 @@ jobs:
         run: flutter pub get
 
       - name: 🔨 Build APK (Debug)
-        run: flutter build apk --debug --verbose
+        run: flutter build apk --debug
 
       - name: 📤 Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -133,7 +130,9 @@ jobs:
           retention-days: 14
 
   # ============================================================
-  # JOB 4: BUILD ANDROID APK/AAB (RELEASE) - Chỉ khi tag/main
+  # JOB 4: BUILD ANDROID RELEASE APK + AAB
+  # Chỉ chạy khi push lên main hoặc tag v*.*.*
+  # Tự detect có keystore secrets hay không và build phù hợp
   # ============================================================
   build_android_release:
     name: 🤖 Android Release
@@ -144,6 +143,10 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')
+
+    # Expose secrets thành env vars ở job level — cách đúng để kiểm tra secret có tồn tại không
+    env:
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
 
     steps:
       - name: 📥 Checkout code
@@ -165,36 +168,48 @@ jobs:
       - name: 📦 Get dependencies
         run: flutter pub get
 
-      - name: 🔑 Setup Keystore (nếu có secrets)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      # Dùng bash if để kiểm tra — KHÔNG dùng secrets trong step if:
+      - name: 🔑 Setup Keystore (nếu có)
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "✅ Keystore secret tìm thấy, setup signed build..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
 
-      - name: 📝 Create key.properties (nếu có secrets)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        run: |
-          cat > android/key.properties << EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
+            # Xóa khoảng trắng thừa khi viết key.properties
+            cat > android/key.properties <<PROPS
+          storePassword=${KEYSTORE_PASSWORD}
+          keyPassword=${KEY_PASSWORD}
+          keyAlias=${KEY_ALIAS}
           storeFile=keystore.jks
-          EOF
+          PROPS
+
+            echo "✅ key.properties đã tạo"
+          else
+            echo "⚠️ Không có KEYSTORE_BASE64 secret → build unsigned (debug signature)"
+          fi
 
       - name: 🏗️ Build Release APK
         run: |
           if [ -f "android/key.properties" ]; then
+            echo "📦 Building SIGNED release APK..."
             flutter build apk --release --obfuscate --split-debug-info=build/debug_symbols
           else
+            echo "📦 Building UNSIGNED release APK (no signing configured)..."
             flutter build apk --release
           fi
 
       - name: 🏗️ Build Release AAB (Google Play)
         run: |
           if [ -f "android/key.properties" ]; then
+            echo "📦 Building SIGNED AAB..."
             flutter build appbundle --release --obfuscate --split-debug-info=build/debug_symbols
           else
+            echo "📦 Building UNSIGNED AAB..."
             flutter build appbundle --release
           fi
 
@@ -213,50 +228,7 @@ jobs:
           retention-days: 30
 
   # ============================================================
-  # JOB 5: BUILD iOS (Simulator) - macOS runner
-  # ============================================================
-  build_ios:
-    name: 🍎 iOS Build
-    runs-on: macos-latest
-    timeout-minutes: 60
-    needs: test
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      startsWith(github.ref, 'refs/tags/v') ||
-      github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🐦 Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: 📦 Get dependencies
-        run: flutter pub get
-
-      - name: 🍎 Install CocoaPods
-        run: |
-          cd ios
-          pod install --repo-update
-
-      - name: 🏗️ Build iOS (no signing - simulator)
-        run: |
-          flutter build ios --release --no-codesign --verbose
-
-      - name: 📤 Upload iOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: viet-calendar-ios-${{ github.run_number }}
-          path: build/ios/iphoneos/Runner.app
-          retention-days: 14
-
-  # ============================================================
-  # JOB 6: CREATE GITHUB RELEASE (Chỉ khi có tag v*.*.*)
+  # JOB 5: CREATE GITHUB RELEASE (chỉ khi push tag v*.*.*)
   # ============================================================
   create_release:
     name: 🎉 Create GitHub Release
@@ -289,19 +261,20 @@ jobs:
       - name: 📋 Generate changelog
         id: changelog
         run: |
-          # Lấy tag trước đó
-          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | sed -n '2p')
           CURR_TAG=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | sed -n '2p')
 
           if [ -z "$PREV_TAG" ]; then
-            CHANGES=$(git log --pretty=format:"- %s (%an)" | head -20)
+            CHANGES=$(git log --pretty=format:"- %s" | head -20)
           else
-            CHANGES=$(git log "${PREV_TAG}..${CURR_TAG}" --pretty=format:"- %s (%an)")
+            CHANGES=$(git log "${PREV_TAG}..${CURR_TAG}" --pretty=format:"- %s")
           fi
 
-          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Dùng delimiter ngẫu nhiên để tránh conflict với nội dung
+          EOF_MARKER=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "CHANGES<<$EOF_MARKER" >> "$GITHUB_OUTPUT"
+          echo "$CHANGES"            >> "$GITHUB_OUTPUT"
+          echo "$EOF_MARKER"         >> "$GITHUB_OUTPUT"
 
       - name: 🎉 Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -312,18 +285,18 @@ jobs:
             ## 🗓️ Lịch Việt ${{ github.ref_name }}
 
             ### 📱 Tải về
-            - **APK** (cài trực tiếp trên Android): `app-release.apk`
-            - **AAB** (đăng tải Google Play): `app-release.aab`
+            - **APK** – cài trực tiếp trên Android: `app-release.apk`
+            - **AAB** – đăng tải Google Play: `app-release.aab`
 
             ### 🆕 Thay đổi
             ${{ steps.changelog.outputs.CHANGES }}
 
-            ### ✨ Tính năng
-            - 📅 Lịch dương & âm lịch Việt Nam
-            - 🏮 Các ngày lễ truyền thống (Tết, Vu Lan, Trung Thu...)
-            - 🇻🇳 Ngày lễ quốc gia (30/4, 1/5, 2/9, 8/3, 20/10...)
-            - 🔔 Thông báo sự kiện như Google Calendar
-            - 🌙 Hiển thị âm lịch trên từng ngày
+            ### ✨ Tính năng chính
+            - 📅 Lịch dương lịch & âm lịch Việt Nam
+            - 🏮 Ngày lễ truyền thống (Tết, Vu Lan, Trung Thu…)
+            - 🇻🇳 Ngày lễ quốc gia (30/4, 1/5, 2/9, 8/3, 20/10…)
+            - 🔔 Thông báo popup như Google Calendar
+            - 🌙 Hiển thị ngày âm lịch trên mỗi ô lịch
 
           files: |
             release_artifacts/*.apk
@@ -332,7 +305,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
 
   # ============================================================
-  # JOB 7: NOTIFY STATUS (Summary)
+  # JOB 6: BUILD SUMMARY
   # ============================================================
   notify:
     name: 📬 Build Summary
@@ -341,16 +314,16 @@ jobs:
     if: always()
 
     steps:
-      - name: 📊 Build Summary
+      - name: 📊 Write summary
         run: |
-          echo "## 🗓️ Lịch Việt - Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Code Quality | ${{ needs.quality.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Android Debug | ${{ needs.build_android_debug.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Flutter Version:** ${{ env.FLUTTER_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "## 🗓️ Lịch Việt – Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo ""                                  >> $GITHUB_STEP_SUMMARY
+          echo "| Job            | Status |"       >> $GITHUB_STEP_SUMMARY
+          echo "|----------------|--------|"       >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality   | ${{ needs.quality.result }} |"           >> $GITHUB_STEP_SUMMARY
+          echo "| Tests          | ${{ needs.test.result }} |"               >> $GITHUB_STEP_SUMMARY
+          echo "| Android Debug  | ${{ needs.build_android_debug.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo ""                                  >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`"  >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`"        >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter:** ${{ env.FLUTTER_VERSION }}"  >> $GITHUB_STEP_SUMMARY

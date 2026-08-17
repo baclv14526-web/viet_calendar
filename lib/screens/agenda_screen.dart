@@ -5,6 +5,8 @@ import '../services/calendar_bloc.dart';
 import '../models/calendar_event.dart';
 import '../utils/vietnamese_holidays.dart';
 import '../widgets/event_card.dart';
+import '../widgets/event_detail_sheet.dart';
+import 'add_event_screen.dart';
 
 class AgendaScreen extends StatelessWidget {
   const AgendaScreen({super.key});
@@ -19,32 +21,34 @@ class AgendaScreen extends StatelessWidget {
       ),
       body: BlocBuilder<CalendarBloc, CalendarState>(
         builder: (context, state) {
-          // Tập hợp tất cả sự kiện từ tháng này và năm tới
           final now = DateTime.now();
-          final allHolidays = [
+          final today = DateTime(now.year, now.month, now.day);
+
+          // Thu thập sự kiện người dùng từ state.events
+          final userEvents = <CalendarEvent>[];
+          for (final evList in state.events.values) {
+            for (final e in evList) {
+              if (e.type == EventType.personal || e.type == EventType.reminder) {
+                final d = DateTime(e.date.year, e.date.month, e.date.day);
+                if (!d.isBefore(today)) userEvents.add(e);
+              }
+            }
+          }
+
+          // Thêm ngày lễ từ 2 năm
+          final holidays = <CalendarEvent>[
             ...VietnameseHolidays.getHolidaysForYear(now.year),
             ...VietnameseHolidays.getHolidaysForYear(now.year + 1),
-          ];
+          ]
+              .where((h) {
+                final d = DateTime(h.date.year, h.date.month, h.date.day);
+                return !d.isBefore(today);
+              })
+              .where((h) => !userEvents.any((e) => e.id == h.id))
+              .toList();
 
-          // Lọc sự kiện từ hôm nay trở đi
-          final upcoming = <CalendarEvent>[];
-          for (final events in state.events.values) {
-            for (final e in events) {
-              if (!e.date.isBefore(DateTime(now.year, now.month, now.day))) {
-                upcoming.add(e);
-              }
-            }
-          }
-          for (final h in allHolidays) {
-            if (!h.date.isBefore(DateTime(now.year, now.month, now.day))) {
-              // Check nếu chưa có trong upcoming
-              if (!upcoming.any((e) => e.id == h.id)) {
-                upcoming.add(h);
-              }
-            }
-          }
-
-          upcoming.sort((a, b) => a.date.compareTo(b.date));
+          final upcoming = [...userEvents, ...holidays]
+            ..sort((a, b) => a.date.compareTo(b.date));
 
           if (upcoming.isEmpty) {
             return const Center(
@@ -65,17 +69,44 @@ class AgendaScreen extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 20),
             itemBuilder: (context, index) {
               final event = upcoming[index];
-              final prevEvent = index > 0 ? upcoming[index - 1] : null;
-
-              // Thêm header ngày
-              final showDateHeader = prevEvent == null ||
-                  !_isSameDay(prevEvent.date, event.date);
-
+              final prev = index > 0 ? upcoming[index - 1] : null;
+              final showHeader = prev == null || !_sameDay(prev.date, event.date);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (showDateHeader) _buildDateHeader(context, event.date),
-                  EventCard(event: event),
+                  if (showHeader) _dateHeader(context, event.date),
+                  EventCard(
+                    event: event,
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => EventDetailSheet(event: event),
+                    ),
+                    onDelete: event.type == EventType.personal
+                        ? () {
+                            context
+                                .read<CalendarBloc>()
+                                .add(DeleteEvent(event.id));
+                          }
+                        : null,
+                    onEdit: event.type == EventType.personal
+                        ? () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddEventScreen(
+                                  initialDate: event.date,
+                                  event: event,
+                                ),
+                              ),
+                            ).then((_) {
+                              if (context.mounted) {
+                                context.read<CalendarBloc>().add(
+                                    LoadCalendarEvents(event.date));
+                              }
+                            })
+                        : null,
+                  ),
                 ],
               );
             },
@@ -85,24 +116,21 @@ class AgendaScreen extends StatelessWidget {
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) =>
+  bool _sameDay(DateTime a, DateTime b) =>
       a.day == b.day && a.month == b.month && a.year == b.year;
 
-  Widget _buildDateHeader(BuildContext context, DateTime date) {
+  Widget _dateHeader(BuildContext context, DateTime date) {
     final theme = Theme.of(context);
     final now = DateTime.now();
-    final isToday = _isSameDay(date, now);
-    final isTomorrow = _isSameDay(
-        date, now.add(const Duration(days: 1)));
+    final isToday = _sameDay(date, now);
+    final isTomorrow =
+        _sameDay(date, now.add(const Duration(days: 1)));
 
-    String label;
-    if (isToday) {
-      label = 'Hôm nay • ${DateFormat('d MMMM', 'vi_VN').format(date)}';
-    } else if (isTomorrow) {
-      label = 'Ngày mai • ${DateFormat('d MMMM', 'vi_VN').format(date)}';
-    } else {
-      label = DateFormat('EEEE, d MMMM yyyy', 'vi_VN').format(date);
-    }
+    final label = isToday
+        ? 'Hôm nay • ${DateFormat('d MMMM', 'vi_VN').format(date)}'
+        : isTomorrow
+            ? 'Ngày mai • ${DateFormat('d MMMM', 'vi_VN').format(date)}'
+            : DateFormat('EEEE, d MMMM yyyy', 'vi_VN').format(date);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 16, 12, 4),

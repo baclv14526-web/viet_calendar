@@ -10,7 +10,7 @@ import 'services/calendar_bloc.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
-import 'screens/calendar_screen.dart';
+import 'widgets/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

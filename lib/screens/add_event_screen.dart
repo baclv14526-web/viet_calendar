@@ -235,7 +235,33 @@ class _AddEventScreenState extends State<AddEventScreen> {
                 onChanged: (v) => setState(() => _eventType = v!),
               ),
             ),
-            const SizedBox(height: 80),
+            const SizedBox(height: 24),
+
+            // Submit Button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton.icon(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _color,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                label: Text(
+                  _isEditing ? 'CẬP NHẬT SỰ KIỆN' : 'LƯU SỰ KIỆN',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 60),
           ],
         ),
       ),
@@ -392,7 +418,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
   }
 
   void _save() {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng điền tiêu đề sự kiện!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final normalizedDate = DateTime(
       _selectedDate.year,
@@ -424,11 +458,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_isEditing ? 'Đã cập nhật sự kiện' : 'Đã thêm sự kiện thành công!'),
+        content: Text(_isEditing ? 'Đã cập nhật sự kiện!' : 'Đã thêm sự kiện thành công!'),
+        backgroundColor: Colors.green.shade700,
         duration: const Duration(seconds: 2),
       ),
     );
 
-    Navigator.pop(context, true);
+    Navigator.pop(context, event);
   }
 }

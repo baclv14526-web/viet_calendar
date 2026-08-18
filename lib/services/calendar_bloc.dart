@@ -259,8 +259,19 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
         // Notification scheduling warning shouldn't prevent event from persisting
       }
 
+      final eventDate = DateTime(
+        event.event.date.year,
+        event.event.date.month,
+        event.event.date.day,
+      );
+
+      emit(state.copyWith(
+        selectedDate: eventDate,
+        focusedMonth: eventDate,
+      ));
+
       // Reload calendar for the event's month
-      add(LoadCalendarEvents(event.event.date));
+      add(LoadCalendarEvents(eventDate));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -279,7 +290,18 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
         // Notification scheduling warning shouldn't prevent event from persisting
       }
 
-      add(LoadCalendarEvents(event.event.date));
+      final eventDate = DateTime(
+        event.event.date.year,
+        event.event.date.month,
+        event.event.date.day,
+      );
+
+      emit(state.copyWith(
+        selectedDate: eventDate,
+        focusedMonth: eventDate,
+      ));
+
+      add(LoadCalendarEvents(eventDate));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }

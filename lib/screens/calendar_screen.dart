@@ -391,24 +391,28 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   void _navigateToAddEvent(BuildContext context, DateTime date) async {
-    await Navigator.push(
+    final result = await Navigator.push<CalendarEvent?>(
       context,
       MaterialPageRoute(builder: (_) => AddEventScreen(initialDate: date)),
     );
     if (context.mounted) {
-      context.read<CalendarBloc>().add(LoadCalendarEvents(date));
+      final targetDate = result?.date ?? date;
+      context.read<CalendarBloc>().add(SelectDate(targetDate));
+      context.read<CalendarBloc>().add(LoadCalendarEvents(targetDate));
     }
   }
 
   void _editEvent(BuildContext context, CalendarEvent event) async {
-    await Navigator.push(
+    final result = await Navigator.push<CalendarEvent?>(
       context,
       MaterialPageRoute(
           builder: (_) =>
               AddEventScreen(initialDate: event.date, event: event)),
     );
     if (context.mounted) {
-      context.read<CalendarBloc>().add(LoadCalendarEvents(event.date));
+      final targetDate = result?.date ?? event.date;
+      context.read<CalendarBloc>().add(SelectDate(targetDate));
+      context.read<CalendarBloc>().add(LoadCalendarEvents(targetDate));
     }
   }
 

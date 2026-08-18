@@ -31,12 +31,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // bottomPadding = chiều cao gesture bar / home indicator
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      // extendBody: true → body vẽ DƯỚI NavigationBar (hiệu ứng trong suốt)
+      extendBody: true,
+      // extendBodyBehindAppBar: true được xử lý ở từng screen con (SliverAppBar)
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        elevation: 8,
+        // height mặc định 80 + gesture bar padding
+        height: 72 + bottomPadding,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        animationDuration: const Duration(milliseconds: 300),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),

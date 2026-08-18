@@ -66,8 +66,14 @@ class _HolidaysScreenState extends State<HolidaysScreen>
 
   Widget _buildHolidayList(List<CalendarEvent> holidays,
       {bool showLunar = false}) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
+    return Builder(
+      builder: (context) => ListView.builder(
+        padding: EdgeInsets.only(
+          left: 8,
+          right: 8,
+          top: 8,
+          bottom: 72 + MediaQuery.paddingOf(context).bottom,
+        ),
       itemCount: holidays.length,
       itemBuilder: (context, index) {
         final h = holidays[index];
@@ -174,6 +180,7 @@ class _HolidaysScreenState extends State<HolidaysScreen>
           ),
         );
       },
-    );
+      ),  // ListView.builder
+    );   // Builder
   }
 }

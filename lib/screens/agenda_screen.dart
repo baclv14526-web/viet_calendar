@@ -66,7 +66,10 @@ class AgendaScreen extends StatelessWidget {
 
           return ListView.builder(
             itemCount: upcoming.length,
-            padding: const EdgeInsets.only(bottom: 20),
+            // padding bottom = NavigationBar (72) + gesture bar
+            padding: EdgeInsets.only(
+              bottom: 72 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemBuilder: (context, index) {
               final event = upcoming[index];
               final prev = index > 0 ? upcoming[index - 1] : null;
@@ -91,9 +94,7 @@ class AgendaScreen extends StatelessWidget {
                           }
                         : null,
                     onEdit: event.type == EventType.personal
-                        ? () async {
-                            final result =
-                                await Navigator.push<CalendarEvent?>(
+                        ? () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AddEventScreen(
@@ -101,14 +102,12 @@ class AgendaScreen extends StatelessWidget {
                                   event: event,
                                 ),
                               ),
-                            );
-                            if (context.mounted) {
-                              final targetDate = result?.date ?? event.date;
-                              context
-                                  .read<CalendarBloc>()
-                                  .add(LoadCalendarEvents(targetDate));
-                            }
-                          }
+                            ).then((_) {
+                              if (context.mounted) {
+                                context.read<CalendarBloc>().add(
+                                    LoadCalendarEvents(event.date));
+                              }
+                            })
                         : null,
                   ),
                 ],
@@ -116,23 +115,6 @@ class AgendaScreen extends StatelessWidget {
             },
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push<CalendarEvent?>(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddEventScreen(initialDate: DateTime.now()),
-            ),
-          );
-          if (context.mounted) {
-            final targetDate = result?.date ?? DateTime.now();
-            context
-                .read<CalendarBloc>()
-                .add(LoadCalendarEvents(targetDate));
-          }
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }

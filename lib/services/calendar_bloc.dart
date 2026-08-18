@@ -140,7 +140,7 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   ) async {
     emit(state.copyWith(isLoading: true));
     try {
-      // Tải sự kiện cá nhân từ DB (bao gồm cả lặp lại)
+      // Tải sự kiện cá nhân từ DB
       final dbEvents = await _db.getEventsForMonth(
         event.month.year,
         event.month.month,
@@ -152,55 +152,16 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
       // Gộp tất cả vào map theo ngày
       final eventMap = <DateTime, List<CalendarEvent>>{};
 
-      void addToMap(CalendarEvent e, DateTime date) {
-        final day = DateTime(date.year, date.month, date.day);
+      void addToMap(CalendarEvent e) {
+        final day = DateTime(e.date.year, e.date.month, e.date.day);
         eventMap.putIfAbsent(day, () => []).add(e);
       }
 
-      final daysInMonth = DateTime(event.month.year, event.month.month + 1, 0).day;
-
       for (final e in dbEvents) {
-        final eventDate = DateTime(e.date.year, e.date.month, e.date.day);
-        if (e.repeatType == RepeatType.none) {
-          if (eventDate.year == event.month.year &&
-              eventDate.month == event.month.month) {
-            addToMap(e, eventDate);
-          }
-        } else if (e.repeatType == RepeatType.daily) {
-          for (int d = 1; d <= daysInMonth; d++) {
-            final day = DateTime(event.month.year, event.month.month, d);
-            if (!day.isBefore(eventDate)) {
-              addToMap(e, day);
-            }
-          }
-        } else if (e.repeatType == RepeatType.weekly) {
-          for (int d = 1; d <= daysInMonth; d++) {
-            final day = DateTime(event.month.year, event.month.month, d);
-            if (day.weekday == eventDate.weekday && !day.isBefore(eventDate)) {
-              addToMap(e, day);
-            }
-          }
-        } else if (e.repeatType == RepeatType.monthly) {
-          if (eventDate.day <= daysInMonth) {
-            final day = DateTime(event.month.year, event.month.month, eventDate.day);
-            if (!day.isBefore(eventDate)) {
-              addToMap(e, day);
-            }
-          }
-        } else if (e.repeatType == RepeatType.yearly) {
-          if (eventDate.month == event.month.month && eventDate.day <= daysInMonth) {
-            final day = DateTime(event.month.year, event.month.month, eventDate.day);
-            if (!day.isBefore(eventDate)) {
-              addToMap(e, day);
-            }
-          }
-        }
+        addToMap(e);
       }
-
       for (final h in holidays) {
-        if (h.date.year == event.month.year && h.date.month == event.month.month) {
-          addToMap(h, h.date);
-        }
+        addToMap(h);
       }
 
       // Sự kiện của ngày được chọn
@@ -253,25 +214,10 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   ) async {
     try {
       await _db.insertEvent(event.event);
-      try {
-        await _notifications.scheduleEventNotification(event.event);
-      } catch (ne) {
-        // Notification scheduling warning shouldn't prevent event from persisting
-      }
+      await _notifications.scheduleEventNotification(event.event);
 
-      final eventDate = DateTime(
-        event.event.date.year,
-        event.event.date.month,
-        event.event.date.day,
-      );
-
-      emit(state.copyWith(
-        selectedDate: eventDate,
-        focusedMonth: eventDate,
-      ));
-
-      // Reload calendar for the event's month
-      add(LoadCalendarEvents(eventDate));
+      // Reload
+      add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -283,25 +229,10 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   ) async {
     try {
       await _db.updateEvent(event.event);
-      try {
-        await _notifications.cancelEventNotification(event.event.id);
-        await _notifications.scheduleEventNotification(event.event);
-      } catch (ne) {
-        // Notification scheduling warning shouldn't prevent event from persisting
-      }
+      await _notifications.cancelEventNotification(event.event.id);
+      await _notifications.scheduleEventNotification(event.event);
 
-      final eventDate = DateTime(
-        event.event.date.year,
-        event.event.date.month,
-        event.event.date.day,
-      );
-
-      emit(state.copyWith(
-        selectedDate: eventDate,
-        focusedMonth: eventDate,
-      ));
-
-      add(LoadCalendarEvents(eventDate));
+      add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
@@ -313,11 +244,7 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   ) async {
     try {
       await _db.deleteEvent(event.eventId);
-      try {
-        await _notifications.cancelEventNotification(event.eventId);
-      } catch (ne) {
-        // Notification cancellation shouldn't fail the delete
-      }
+      await _notifications.cancelEventNotification(event.eventId);
 
       add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {

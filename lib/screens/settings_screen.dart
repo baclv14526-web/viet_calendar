@@ -46,8 +46,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
       ),
-      body: ListView(
-        children: [
+      body: Builder(
+        builder: (context) => ListView(
+          padding: EdgeInsets.only(
+            bottom: 72 + MediaQuery.paddingOf(context).bottom,
+          ),
           _header('🔔 Thông báo'),
           SwitchListTile(
             value: _notifyHolidays,
@@ -163,7 +166,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 32),
         ],
-      ),
+        ),  // ListView
+      ),    // Builder
     );
   }
 

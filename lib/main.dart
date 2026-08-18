@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,14 +16,25 @@ import 'widgets/notification_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Locale tiếng Việt cho intl / DateFormat
   await initializeDateFormatting('vi_VN', null);
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
-  );
+  // Edge-to-edge: app vẽ dưới status bar + navigation bar
+  // Hoạt động đúng trên Android 9+ (API 28+)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
+
+  // Chỉ hỗ trợ portrait (lịch không cần landscape)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   final notificationService = NotificationService();
   await notificationService.initialize();
@@ -32,24 +44,17 @@ void main() async {
 }
 
 Future<void> _requestPermissions(NotificationService ns) async {
-  // Xin quyền thông báo (chỉ cần thiết trên Android 13+ và iOS)
   await ns.requestPermission();
 
-  // SCHEDULE_EXACT_ALARM chỉ có trên Android 12+ (API 31+)
-  // Android 9 không có permission này → skip để tránh crash
   if (Platform.isAndroid) {
     final info = await DeviceInfoPlugin().androidInfo;
     final sdkInt = info.version.sdkInt;
-    debugPrint('[Main] Android SDK: $sdkInt');
-
     if (sdkInt >= 31) {
-      // Android 12+: xin exact alarm permission
       final status = await Permission.scheduleExactAlarm.status;
       if (status.isDenied) {
         await Permission.scheduleExactAlarm.request();
       }
     }
-    // Android 9, 10, 11 (API 28-30): exact alarm tự động OK, không cần xin
   }
 }
 
@@ -65,21 +70,48 @@ class VietCalendarApp extends StatelessWidget {
         RepositoryProvider(create: (_) => notificationService),
       ],
       child: BlocProvider(
-        create: (context) => CalendarBloc(
-          db: context.read<DatabaseService>(),
-          notifications: context.read<NotificationService>(),
+        create: (ctx) => CalendarBloc(
+          db: ctx.read<DatabaseService>(),
+          notifications: ctx.read<NotificationService>(),
         ),
         child: MaterialApp(
           title: 'Lịch Việt',
           debugShowCheckedModeBanner: false,
+
+          // ── Localizations: bắt buộc để showDatePicker / showTimePicker
+          //    hiển thị tiếng Việt và NavigationBar render đúng
           locale: const Locale('vi', 'VN'),
           supportedLocales: const [
             Locale('vi', 'VN'),
             Locale('en', 'US'),
           ],
-          theme: _buildLightTheme(),
-          darkTheme: _buildDarkTheme(),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+
+          theme: _lightTheme(),
+          darkTheme: _darkTheme(),
           themeMode: ThemeMode.system,
+
+          // builder: bao SafeArea + điều chỉnh MediaQuery cho edge-to-edge
+          builder: (context, child) {
+            // Lấy padding thực của device (notch, punch-hole, nav bar)
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              // Giữ nguyên padding hệ thống — các screen tự quyết định
+              // dùng SafeArea hay không
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(
+                  minScaleFactor: 0.8,
+                  maxScaleFactor: 1.3, // Tránh text to quá vỡ layout
+                ),
+              ),
+              child: child!,
+            );
+          },
+
           home: NotificationServiceProvider(
             service: notificationService,
             child: const HomeScreen(),
@@ -89,23 +121,28 @@ class VietCalendarApp extends StatelessWidget {
     );
   }
 
-  ThemeData _buildLightTheme() {
-    const primaryColor = Color(0xFF1565C0);
-    const secondaryColor = Color(0xFFD32F2F);
-
+  ThemeData _lightTheme() {
+    const primary = Color(0xFF1565C0);
+    const secondary = Color(0xFFD32F2F);
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        secondary: secondaryColor,
+        seedColor: primary,
+        secondary: secondary,
         brightness: Brightness.light,
       ),
       textTheme: GoogleFonts.notoSansTextTheme(),
       appBarTheme: const AppBarTheme(
-        backgroundColor: primaryColor,
+        backgroundColor: primary,
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
+        // Quan trọng: systemOverlayStyle ở đây override cho mọi AppBar
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+        ),
       ),
       cardTheme: const CardTheme(
         elevation: 2,
@@ -114,29 +151,83 @@ class VietCalendarApp extends StatelessWidget {
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: primaryColor,
+        backgroundColor: primary,
         foregroundColor: Colors.white,
         elevation: 4,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: Colors.white,
+        indicatorColor: primary.withOpacity(0.15),
+        labelTextStyle: WidgetStateProperty.all(
+          const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      dialogTheme: const DialogTheme(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+        ),
       ),
     );
   }
 
-  ThemeData _buildDarkTheme() {
-    const primaryColor = Color(0xFF42A5F5);
-    const secondaryColor = Color(0xFFEF5350);
-
+  ThemeData _darkTheme() {
+    const primary = Color(0xFF42A5F5);
+    const secondary = Color(0xFFEF5350);
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        secondary: secondaryColor,
+        seedColor: primary,
+        secondary: secondary,
         brightness: Brightness.dark,
       ),
       textTheme: GoogleFonts.notoSansTextTheme(ThemeData.dark().textTheme),
+      appBarTheme: const AppBarTheme(
+        elevation: 0,
+        centerTitle: false,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+        ),
+      ),
       cardTheme: const CardTheme(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        indicatorColor: primary.withOpacity(0.2),
+        labelTextStyle: WidgetStateProperty.all(
+          const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+        ),
+      ),
+      dialogTheme: const DialogTheme(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
         ),
       ),
     );

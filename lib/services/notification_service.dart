@@ -146,102 +146,93 @@ class NotificationService {
   Future<void> scheduleEventNotification(CalendarEvent event) async {
     if (!event.hasNotification) return;
 
-    try {
-      final notifTime = _getNotificationTime(event);
-      if (notifTime == null) return;
+    final notifTime = _getNotificationTime(event);
+    if (notifTime == null) return;
 
-      // Bỏ qua nếu thời gian đã qua
-      if (notifTime.isBefore(DateTime.now())) return;
+    // Bỏ qua nếu thời gian đã qua
+    if (notifTime.isBefore(DateTime.now())) return;
 
-      final tzTime = tz.TZDateTime.from(notifTime, tz.local);
+    final tzTime = tz.TZDateTime.from(notifTime, tz.local);
 
-      final isHoliday = event.type == EventType.holiday ||
-          event.type == EventType.lunarHoliday;
+    final isHoliday = event.type == EventType.holiday ||
+        event.type == EventType.lunarHoliday;
 
-      // fullScreenIntent chỉ hỗ trợ Android 10+ (API 29+)
-      // Android 9 dùng thông báo thường thay thế
-      final useFullScreen = !isHoliday && _androidSdkVersion >= _androidQ;
+    // fullScreenIntent chỉ hỗ trợ Android 10+ (API 29+)
+    // Android 9 dùng thông báo thường thay thế
+    final useFullScreen = !isHoliday && _androidSdkVersion >= _androidQ;
 
-      final androidDetails = AndroidNotificationDetails(
-        isHoliday ? 'holiday_channel' : 'event_channel',
-        isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
-        channelDescription: isHoliday
-            ? 'Thông báo về các ngày lễ và sự kiện đặc biệt'
-            : 'Thông báo nhắc nhở các sự kiện trong lịch',
-        importance: isHoliday ? Importance.defaultImportance : Importance.high,
-        priority: isHoliday ? Priority.defaultPriority : Priority.high,
-        color: event.color,
-        styleInformation: BigTextStyleInformation(
-          event.description ?? '',
-          contentTitle: event.title,
-          summaryText: 'Lịch Việt',
-        ),
-        category: isHoliday
-            ? AndroidNotificationCategory.event
-            : AndroidNotificationCategory.reminder,
-        fullScreenIntent: useFullScreen,
-        icon: '@mipmap/ic_launcher',
-      );
+    final androidDetails = AndroidNotificationDetails(
+      isHoliday ? 'holiday_channel' : 'event_channel',
+      isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
+      channelDescription: isHoliday
+          ? 'Thông báo về các ngày lễ và sự kiện đặc biệt'
+          : 'Thông báo nhắc nhở các sự kiện trong lịch',
+      importance: isHoliday ? Importance.defaultImportance : Importance.high,
+      priority: isHoliday ? Priority.defaultPriority : Priority.high,
+      color: event.color,
+      styleInformation: BigTextStyleInformation(
+        event.description ?? '',
+        contentTitle: event.title,
+        summaryText: 'Lịch Việt',
+      ),
+      category: isHoliday
+          ? AndroidNotificationCategory.event
+          : AndroidNotificationCategory.reminder,
+      fullScreenIntent: useFullScreen,
+      icon: '@mipmap/ic_launcher',
+    );
 
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.active,
-      );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.active,
+    );
 
-      final details = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
-      AndroidScheduleMode scheduleMode;
-      if (_androidSdkVersion >= _androidS) {
-        final androidPlugin = _notifications
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
-        final canScheduleExact =
-            await androidPlugin?.canScheduleExactNotifications() ?? false;
-        scheduleMode = canScheduleExact
-            ? AndroidScheduleMode.exactAllowWhileIdle
-            : AndroidScheduleMode.inexactAllowWhileIdle;
-      } else {
-        // Android 9, 10, 11 — exact luôn hoạt động
-        scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
-      }
-
-      await _notifications.zonedSchedule(
-        event.id.hashCode,
-        event.title,
-        _buildNotificationBody(event),
-        tzTime,
-        details,
-        androidScheduleMode: scheduleMode,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: event.id,
-      );
-    } catch (e) {
-      debugPrint('[NotificationService] scheduleEventNotification error: $e');
+    // Android 9-11: exactAllowWhileIdle hoạt động bình thường, không cần permission
+    // Android 12+: cần SCHEDULE_EXACT_ALARM permission
+    // Nếu không có permission (user từ chối), fallback sang inexact (sai giờ tối đa 15p)
+    AndroidScheduleMode scheduleMode;
+    if (_androidSdkVersion >= _androidS) {
+      final androidPlugin = _notifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final canScheduleExact =
+          await androidPlugin?.canScheduleExactNotifications() ?? false;
+      scheduleMode = canScheduleExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+    } else {
+      // Android 9, 10, 11 — exact luôn hoạt động
+      scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
     }
+
+    await _notifications.zonedSchedule(
+      event.id.hashCode,
+      event.title,
+      _buildNotificationBody(event),
+      tzTime,
+      details,
+      androidScheduleMode: scheduleMode,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: event.id,
+    );
   }
 
   /// Hủy thông báo của một sự kiện
   Future<void> cancelEventNotification(String eventId) async {
-    try {
-      await _notifications.cancel(eventId.hashCode);
-    } catch (e) {
-      debugPrint('[NotificationService] cancelEventNotification error: $e');
-    }
+    await _notifications.cancel(eventId.hashCode);
   }
 
   /// Hủy tất cả thông báo
   Future<void> cancelAllNotifications() async {
-    try {
-      await _notifications.cancelAll();
-    } catch (e) {
-      debugPrint('[NotificationService] cancelAllNotifications error: $e');
-    }
+    await _notifications.cancelAll();
   }
 
   /// Hiển thị thông báo ngay lập tức (để test)
@@ -274,28 +265,32 @@ class NotificationService {
 
   DateTime? _getNotificationTime(CalendarEvent event) {
     final eventDate = event.date;
-    if (event.isAllDay || event.startTime == null) {
-      final baseDate = DateTime(
+    if (event.isAllDay) {
+      // Thông báo lúc 8:00 sáng ngày hôm đó hoặc ngày hôm trước
+      final minutesBefore = event.notificationMinutesBefore ?? 60 * 24;
+      return DateTime(
         eventDate.year,
         eventDate.month,
         eventDate.day,
         8,
         0,
-      );
-      final minutesBefore = event.notificationMinutesBefore ?? 30;
-      return baseDate.subtract(Duration(minutes: minutesBefore));
+      ).subtract(Duration(minutes: minutesBefore - 8 * 60));
     }
 
-    final eventDateTime = DateTime(
-      eventDate.year,
-      eventDate.month,
-      eventDate.day,
-      event.startTime!.hour,
-      event.startTime!.minute,
-    );
-    return eventDateTime.subtract(
-      Duration(minutes: event.notificationMinutesBefore ?? 30),
-    );
+    if (event.startTime != null) {
+      final eventDateTime = DateTime(
+        eventDate.year,
+        eventDate.month,
+        eventDate.day,
+        event.startTime!.hour,
+        event.startTime!.minute,
+      );
+      return eventDateTime.subtract(
+        Duration(minutes: event.notificationMinutesBefore ?? 30),
+      );
+    }
+
+    return null;
   }
 
   String _buildNotificationBody(CalendarEvent event) {

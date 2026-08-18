@@ -55,7 +55,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
     final e = widget.event;
     _titleCtrl = TextEditingController(text: e?.title ?? '');
     _descCtrl = TextEditingController(text: e?.description ?? '');
-    _selectedDate = e?.date ?? widget.initialDate;
+    final init = e?.date ?? widget.initialDate;
+    _selectedDate = DateTime(init.year, init.month, init.day);
     _startTime = e?.startTime;
     _endTime = e?.endTime;
     _eventType = e?.type ?? EventType.personal;
@@ -393,11 +394,17 @@ class _AddEventScreenState extends State<AddEventScreen> {
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
+    final normalizedDate = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+
     final event = CalendarEvent(
       id: widget.event?.id ?? const Uuid().v4(),
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-      date: _selectedDate,
+      date: normalizedDate,
       startTime: _isAllDay ? null : _startTime,
       endTime: _isAllDay ? null : _endTime,
       type: _eventType,
@@ -415,6 +422,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
       bloc.add(AddEvent(event));
     }
 
-    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isEditing ? 'Đã cập nhật sự kiện' : 'Đã thêm sự kiện thành công!'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    Navigator.pop(context, true);
   }
 }

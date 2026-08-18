@@ -63,38 +63,34 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget _buildSliverAppBar(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
     return SliverAppBar(
-      expandedHeight: 80,
       floating: true,
       pinned: true,
       elevation: 0,
       backgroundColor: theme.colorScheme.primary,
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        title: Row(
-          children: [
-            const Icon(Icons.calendar_today, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Lịch Việt',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.calendar_month, color: Colors.white, size: 22),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Lịch Việt',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
                 ),
-                Text(
-                  DateFormat('MMMM yyyy', 'vi_VN')
-                      .format(state.focusedMonth),
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              Text(
+                DateFormat('MMMM yyyy', 'vi_VN').format(state.focusedMonth),
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+        ],
       ),
       actions: [
         IconButton(
@@ -137,82 +133,71 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget _buildCalendar(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: TableCalendar<CalendarEvent>(
-        locale: 'vi_VN',
-        firstDay: DateTime.utc(2000, 1, 1),
-        lastDay: DateTime.utc(2050, 12, 31),
-        focusedDay: state.focusedMonth,
-        selectedDayPredicate: (day) => isSameDay(day, state.selectedDate),
-        calendarFormat: state.viewMode == CalendarViewMode.week
-            ? CalendarFormat.week
-            : CalendarFormat.month,
-        eventLoader: (day) {
-          final key = DateTime(day.year, day.month, day.day);
-          return state.events[key] ?? [];
-        },
-        onDaySelected: (selectedDay, focusedDay) =>
-            context.read<CalendarBloc>().add(SelectDate(selectedDay)),
-        onPageChanged: (focusedDay) =>
-            context.read<CalendarBloc>().add(LoadCalendarEvents(focusedDay)),
-        calendarStyle: CalendarStyle(
-          outsideDaysVisible: false,
-          todayDecoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-          selectedDecoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            shape: BoxShape.circle,
-          ),
-          todayTextStyle: TextStyle(
-              color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-          selectedTextStyle:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          weekendTextStyle: const TextStyle(color: Color(0xFFE53935)),
-          markerDecoration: BoxDecoration(
-            color: theme.colorScheme.secondary,
-            shape: BoxShape.circle,
-          ),
-          markersMaxCount: 3,
-          markerSize: 6,
-          cellMargin: const EdgeInsets.all(4),
-        ),
-        calendarBuilders: CalendarBuilders(
-          defaultBuilder: (context, day, _) =>
-              _buildDayCell(context, day, state, false),
-          todayBuilder: (context, day, _) =>
-              _buildDayCell(context, day, state, false, isToday: true),
-          selectedBuilder: (context, day, _) =>
-              _buildDayCell(context, day, state, true),
-          markerBuilder: (context, day, events) {
-            if (events.isEmpty) return const SizedBox.shrink();
-            return _buildEventMarkers(events);
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: TableCalendar<CalendarEvent>(
+          locale: 'vi_VN',
+          firstDay: DateTime.utc(2000, 1, 1),
+          lastDay: DateTime.utc(2050, 12, 31),
+          focusedDay: state.focusedMonth,
+          rowHeight: 48,
+          daysOfWeekHeight: 24,
+          selectedDayPredicate: (day) => isSameDay(day, state.selectedDate),
+          calendarFormat: state.viewMode == CalendarViewMode.week
+              ? CalendarFormat.week
+              : CalendarFormat.month,
+          eventLoader: (day) {
+            final key = DateTime(day.year, day.month, day.day);
+            return state.events[key] ?? [];
           },
-        ),
-        headerStyle: HeaderStyle(
-          formatButtonVisible: false,
-          titleCentered: true,
-          titleTextStyle: TextStyle(
-              color: theme.colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.bold),
-          leftChevronIcon:
-              Icon(Icons.chevron_left, color: theme.colorScheme.primary),
-          rightChevronIcon:
-              Icon(Icons.chevron_right, color: theme.colorScheme.primary),
-        ),
-        daysOfWeekStyle: DaysOfWeekStyle(
-          weekdayStyle: TextStyle(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w600),
-          weekendStyle: const TextStyle(
-              color: Color(0xFFE53935),
-              fontSize: 12,
-              fontWeight: FontWeight.w600),
+          onDaySelected: (selectedDay, focusedDay) =>
+              context.read<CalendarBloc>().add(SelectDate(selectedDay)),
+          onPageChanged: (focusedDay) =>
+              context.read<CalendarBloc>().add(LoadCalendarEvents(focusedDay)),
+          calendarStyle: const CalendarStyle(
+            outsideDaysVisible: false,
+            cellMargin: EdgeInsets.zero,
+            cellPadding: EdgeInsets.zero,
+          ),
+          calendarBuilders: CalendarBuilders(
+            defaultBuilder: (context, day, _) =>
+                _buildDayCell(context, day, state, false),
+            todayBuilder: (context, day, _) =>
+                _buildDayCell(context, day, state, false, isToday: true),
+            selectedBuilder: (context, day, _) =>
+                _buildDayCell(context, day, state, true),
+            outsideBuilder: (context, day, _) => const SizedBox.shrink(),
+            markerBuilder: (context, day, events) {
+              if (events.isEmpty) return const SizedBox.shrink();
+              return _buildEventMarkers(events);
+            },
+          ),
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            titleTextStyle: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 15,
+                fontWeight: FontWeight.bold),
+            leftChevronIcon:
+                Icon(Icons.chevron_left, color: theme.colorScheme.primary),
+            rightChevronIcon:
+                Icon(Icons.chevron_right, color: theme.colorScheme.primary),
+            headerPadding: const EdgeInsets.symmetric(vertical: 4),
+          ),
+          daysOfWeekStyle: DaysOfWeekStyle(
+            weekdayStyle: TextStyle(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                fontSize: 11,
+                fontWeight: FontWeight.w600),
+            weekendStyle: const TextStyle(
+                color: Color(0xFFE53935),
+                fontSize: 11,
+                fontWeight: FontWeight.w600),
+          ),
         ),
       ),
     );
@@ -239,41 +224,48 @@ class _CalendarScreenState extends State<CalendarScreen>
         : theme.colorScheme.onSurface;
     if (isSelected) textColor = Colors.white;
 
-    return Container(
-      margin: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? theme.colorScheme.primary
-            : isToday
-                ? theme.colorScheme.primary.withOpacity(0.15)
-                : Colors.transparent,
-        shape: BoxShape.circle,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${day.day}',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 14,
-              fontWeight: isToday || isSelected
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+    return Center(
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary
+              : isToday
+                  ? theme.colorScheme.primary.withOpacity(0.15)
+                  : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 13,
+                height: 1.1,
+                fontWeight: isToday || isSelected
+                    ? FontWeight.bold
+                    : FontWeight.w500,
+              ),
             ),
-          ),
-          Text(
-            lunar.day == 1
-                ? '${lunar.day}/${lunar.month}'
-                : '${lunar.day}',
-            style: TextStyle(
-              color: isSelected
-                  ? Colors.white70
-                  : textColor.withOpacity(0.6),
-              fontSize: 8,
+            Text(
+              lunar.day == 1
+                  ? '${lunar.day}/${lunar.month}'
+                  : '${lunar.day}',
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white70
+                    : textColor.withOpacity(0.6),
+                fontSize: 8,
+                height: 1.1,
+                fontWeight: lunar.day == 1 ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -281,13 +273,13 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget _buildEventMarkers(List<CalendarEvent> events) {
     final colors = events.take(3).map((e) => e.color).toSet().take(3).toList();
     return Positioned(
-      bottom: 1,
+      bottom: 2,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: colors
             .map((c) => Container(
-                  width: 5,
-                  height: 5,
+                  width: 4,
+                  height: 4,
                   margin: const EdgeInsets.symmetric(horizontal: 0.5),
                   decoration:
                       BoxDecoration(color: c, shape: BoxShape.circle),
@@ -303,14 +295,18 @@ class _CalendarScreenState extends State<CalendarScreen>
         DateFormat('EEEE, d MMMM', 'vi_VN').format(state.selectedDate);
     final count = state.selectedDateEvents.length;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         children: [
-          Text(
-            dateStr,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary,
+          Expanded(
+            child: Text(
+              dateStr,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
@@ -334,7 +330,10 @@ class _CalendarScreenState extends State<CalendarScreen>
   Widget _buildEventList(BuildContext context, CalendarState state) {
     if (state.isLoading) {
       return const SliverToBoxAdapter(
-          child: Center(child: CircularProgressIndicator()));
+          child: Center(child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: CircularProgressIndicator(),
+          )));
     }
     if (state.selectedDateEvents.isEmpty) {
       return SliverToBoxAdapter(child: _buildEmptyState(context, state));
@@ -391,28 +390,26 @@ class _CalendarScreenState extends State<CalendarScreen>
     );
   }
 
-  void _navigateToAddEvent(BuildContext context, DateTime date) {
-    Navigator.push(
+  void _navigateToAddEvent(BuildContext context, DateTime date) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => AddEventScreen(initialDate: date)),
-    ).then((_) {
-      if (context.mounted) {
-        context.read<CalendarBloc>().add(LoadCalendarEvents(date));
-      }
-    });
+    );
+    if (context.mounted) {
+      context.read<CalendarBloc>().add(LoadCalendarEvents(date));
+    }
   }
 
-  void _editEvent(BuildContext context, CalendarEvent event) {
-    Navigator.push(
+  void _editEvent(BuildContext context, CalendarEvent event) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
           builder: (_) =>
               AddEventScreen(initialDate: event.date, event: event)),
-    ).then((_) {
-      if (context.mounted) {
-        context.read<CalendarBloc>().add(LoadCalendarEvents(event.date));
-      }
-    });
+    );
+    if (context.mounted) {
+      context.read<CalendarBloc>().add(LoadCalendarEvents(event.date));
+    }
   }
 
   void _deleteEvent(BuildContext context, CalendarEvent event) {

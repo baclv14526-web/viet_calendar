@@ -51,40 +51,41 @@ class LunarInfoWidget extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Âm lịch: ',
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer
-                            .withOpacity(0.7),
-                        fontSize: 12,
-                      ),
+                Text.rich(
+                  TextSpan(
+                    text: 'Âm lịch: ',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
+                      fontSize: 12,
                     ),
-                    Text(
-                      'Ngày ${lunar.day} tháng ${lunar.month}${lunar.isLeapMonth ? " (nhuận)" : ""} năm $yearName',
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                    children: [
+                      TextSpan(
+                        text: 'Ngày ${lunar.day} tháng ${lunar.month}${lunar.isLeapMonth ? " (nhuận)" : ""} năm $yearName',
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Row(
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     _tag(context, '🐉 $zodiac', theme.colorScheme.primary),
-                    const SizedBox(width: 6),
                     if (isToday)
-                      _tag(context, '• Hôm nay',
-                          theme.colorScheme.secondary),
-                    const SizedBox(width: 6),
+                      _tag(context, '• Hôm nay', theme.colorScheme.secondary),
                     _tag(
                       context,
                       '🗓 ${DateFormat('d/M/y').format(date)}',
-                      Colors.grey,
+                      Colors.grey.shade700,
                     ),
                   ],
                 ),
@@ -100,16 +101,16 @@ class LunarInfoWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 10,
           color: color,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

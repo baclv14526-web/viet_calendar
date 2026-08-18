@@ -92,16 +92,15 @@ class DatabaseService {
 
   Future<List<CalendarEvent>> getEventsForMonth(int year, int month) async {
     final db = await database;
-    final startOfMonth = DateTime(year, month, 1);
-    final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
+    final startOfMonth = DateTime(year, month, 1).toIso8601String();
+    final endOfMonth =
+        DateTime(year, month + 1, 0, 23, 59, 59, 999).toIso8601String();
 
     final maps = await db.query(
       'events',
-      where: 'date >= ? AND date <= ?',
-      whereArgs: [
-        startOfMonth.toIso8601String(),
-        endOfMonth.toIso8601String()
-      ],
+      where: '(date >= ? AND date <= ?) OR repeatType != 0',
+      whereArgs: [startOfMonth, endOfMonth],
+      orderBy: 'date ASC',
     );
     return maps.map((m) => CalendarEvent.fromMap(m)).toList();
   }

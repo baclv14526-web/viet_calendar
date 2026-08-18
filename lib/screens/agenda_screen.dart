@@ -91,7 +91,8 @@ class AgendaScreen extends StatelessWidget {
                           }
                         : null,
                     onEdit: event.type == EventType.personal
-                        ? () => Navigator.push(
+                        ? () async {
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AddEventScreen(
@@ -99,12 +100,13 @@ class AgendaScreen extends StatelessWidget {
                                   event: event,
                                 ),
                               ),
-                            ).then((_) {
-                              if (context.mounted) {
-                                context.read<CalendarBloc>().add(
-                                    LoadCalendarEvents(event.date));
-                              }
-                            })
+                            );
+                            if (context.mounted) {
+                              context
+                                  .read<CalendarBloc>()
+                                  .add(LoadCalendarEvents(event.date));
+                            }
+                          }
                         : null,
                   ),
                 ],
@@ -112,6 +114,22 @@ class AgendaScreen extends StatelessWidget {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddEventScreen(initialDate: DateTime.now()),
+            ),
+          );
+          if (context.mounted) {
+            context
+                .read<CalendarBloc>()
+                .add(LoadCalendarEvents(DateTime.now()));
+          }
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }

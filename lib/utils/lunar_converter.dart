@@ -26,7 +26,7 @@ class LunarConverter {
     final t = k / 1236.85;
     final t2 = t * t;
     final t3 = t2 * t;
-    final dr = pi / 180;
+    const dr = pi / 180;
     var jd1 = 2415020.75933 +
         29.53058868 * k +
         0.0001178 * t2 -
@@ -75,7 +75,7 @@ class LunarConverter {
   static double _sunLongitude(double jdn) {
     final t = (jdn - 2451545.0) / 36525;
     final t2 = t * t;
-    final dr = pi / 180;
+    const dr = pi / 180;
     final bigM = 357.5291 + 35999.0503 * t - 0.0001559 * t2 -
         0.00000048 * t * t2;
     final l0 = 280.46645 + 36000.76983 * t + 0.0003032 * t2;

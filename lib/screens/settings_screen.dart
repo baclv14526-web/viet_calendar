@@ -51,7 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: EdgeInsets.only(
             bottom: 72 + MediaQuery.paddingOf(context).bottom,
           ),
-          _header('🔔 Thông báo'),
+          children: [
+            _header('🔔 Thông báo'),
           SwitchListTile(
             value: _notifyHolidays,
             onChanged: (v) {

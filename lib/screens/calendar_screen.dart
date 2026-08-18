@@ -174,7 +174,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             // markerBuilder trả về null — dots được vẽ trong _dayCell luôn
             markerBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
-          calendarStyle: CalendarStyle(
+          calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
             // Tắt decoration mặc định để _dayCell kiểm soát hoàn toàn
             defaultDecoration: const BoxDecoration(),

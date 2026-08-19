@@ -54,16 +54,17 @@ class ChangeViewMode extends CalendarBlocEvent {
 }
 
 // ============ STATE ============
-enum CalendarViewMode { month, week, day, agenda }
+enum CalendarViewMode { month, week, day }
 
 class CalendarState extends Equatable {
   final DateTime selectedDate;
+  // focusedMonth chỉ dùng để track tháng hiện tại cho header title
+  // KHÔNG dùng để drive TableCalendar.focusedDay (tránh giật)
   final DateTime focusedMonth;
   final Map<DateTime, List<CalendarEvent>> events;
   final List<CalendarEvent> selectedDateEvents;
-  final List<CalendarEvent> holidays;
   final CalendarViewMode viewMode;
-  final bool isLoading;
+  // Bỏ isLoading khỏi state → không emit loading state giữa animation
   final String? error;
 
   const CalendarState({
@@ -71,9 +72,7 @@ class CalendarState extends Equatable {
     required this.focusedMonth,
     this.events = const {},
     this.selectedDateEvents = const [],
-    this.holidays = const [],
     this.viewMode = CalendarViewMode.month,
-    this.isLoading = false,
     this.error,
   });
 
@@ -82,9 +81,7 @@ class CalendarState extends Equatable {
     DateTime? focusedMonth,
     Map<DateTime, List<CalendarEvent>>? events,
     List<CalendarEvent>? selectedDateEvents,
-    List<CalendarEvent>? holidays,
     CalendarViewMode? viewMode,
-    bool? isLoading,
     String? error,
   }) {
     return CalendarState(
@@ -92,9 +89,7 @@ class CalendarState extends Equatable {
       focusedMonth: focusedMonth ?? this.focusedMonth,
       events: events ?? this.events,
       selectedDateEvents: selectedDateEvents ?? this.selectedDateEvents,
-      holidays: holidays ?? this.holidays,
       viewMode: viewMode ?? this.viewMode,
-      isLoading: isLoading ?? this.isLoading,
       error: error,
     );
   }
@@ -105,9 +100,7 @@ class CalendarState extends Equatable {
         focusedMonth,
         events,
         selectedDateEvents,
-        holidays,
         viewMode,
-        isLoading,
         error,
       ];
 }
@@ -116,6 +109,9 @@ class CalendarState extends Equatable {
 class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   final DatabaseService _db;
   final NotificationService _notifications;
+
+  // Cache events theo tháng để không reload khi lướt qua lại
+  final Map<String, Map<DateTime, List<CalendarEvent>>> _cache = {};
 
   CalendarBloc({
     required DatabaseService db,
@@ -134,78 +130,131 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
     on<ChangeViewMode>(_onChangeViewMode);
   }
 
+  String _cacheKey(int year, int month) => '$year-$month';
+
   Future<void> _onLoadEvents(
     LoadCalendarEvents event,
     Emitter<CalendarState> emit,
   ) async {
-    emit(state.copyWith(isLoading: true));
-    try {
-      // Tải sự kiện cá nhân từ DB
-      final dbEvents = await _db.getEventsForMonth(
-        event.month.year,
-        event.month.month,
-      );
+    final year = event.month.year;
+    final month = event.month.month;
+    final key = _cacheKey(year, month);
 
-      // Tải ngày lễ
-      final holidays = VietnameseHolidays.getHolidaysForYear(event.month.year);
-
-      // Gộp tất cả vào map theo ngày
-      final eventMap = <DateTime, List<CalendarEvent>>{};
-
-      void addToMap(CalendarEvent e) {
-        final day = DateTime(e.date.year, e.date.month, e.date.day);
-        eventMap.putIfAbsent(day, () => []).add(e);
-      }
-
-      for (final e in dbEvents) {
-        addToMap(e);
-      }
-      for (final h in holidays) {
-        addToMap(h);
-      }
-
-      // Sự kiện của ngày được chọn
+    // Nếu đã cache → emit ngay, không show loading, không giật
+    if (_cache.containsKey(key)) {
+      final cached = _cache[key]!;
       final selectedDay = DateTime(
         state.selectedDate.year,
         state.selectedDate.month,
         state.selectedDate.day,
       );
-      final selectedEvents = eventMap[selectedDay] ?? [];
+      emit(state.copyWith(
+        events: cached,
+        selectedDateEvents: cached[selectedDay] ?? [],
+        focusedMonth: event.month,
+      ));
+      return;
+    }
 
+    // Chưa cache → load ngầm (KHÔNG emit isLoading để tránh giật)
+    try {
+      final dbEvents = await _db.getEventsForMonth(year, month);
+      final holidays = VietnameseHolidays.getHolidaysForYear(year);
+
+      final eventMap = <DateTime, List<CalendarEvent>>{};
+      void addToMap(CalendarEvent e) {
+        final day = DateTime(e.date.year, e.date.month, e.date.day);
+        eventMap.putIfAbsent(day, () => []).add(e);
+      }
+      for (final e in dbEvents) addToMap(e);
+      for (final h in holidays) addToMap(h);
+
+      // Lưu cache
+      _cache[key] = eventMap;
+
+      // Cũng load tháng kề (prefetch) để lướt qua không lag
+      _prefetchAdjacentMonths(year, month);
+
+      final selectedDay = DateTime(
+        state.selectedDate.year,
+        state.selectedDate.month,
+        state.selectedDate.day,
+      );
       emit(state.copyWith(
         events: eventMap,
-        selectedDateEvents: selectedEvents,
-        holidays: holidays,
+        selectedDateEvents: eventMap[selectedDay] ?? [],
         focusedMonth: event.month,
-        isLoading: false,
       ));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(error: e.toString()));
     }
+  }
+
+  /// Prefetch 2 tháng kề (trước + sau) ngầm, không emit state
+  void _prefetchAdjacentMonths(int year, int month) {
+    final prevMonth = month == 1 ? 12 : month - 1;
+    final prevYear = month == 1 ? year - 1 : year;
+    final nextMonth = month == 12 ? 1 : month + 1;
+    final nextYear = month == 12 ? year + 1 : year;
+
+    for (final ym in [(prevYear, prevMonth), (nextYear, nextMonth)]) {
+      final key = _cacheKey(ym.$1, ym.$2);
+      if (!_cache.containsKey(key)) {
+        _loadMonthToCache(ym.$1, ym.$2);
+      }
+    }
+  }
+
+  Future<void> _loadMonthToCache(int year, int month) async {
+    final key = _cacheKey(year, month);
+    if (_cache.containsKey(key)) return;
+    try {
+      final dbEvents = await _db.getEventsForMonth(year, month);
+      final holidays = VietnameseHolidays.getHolidaysForYear(year);
+      final eventMap = <DateTime, List<CalendarEvent>>{};
+      void addToMap(CalendarEvent e) {
+        final day = DateTime(e.date.year, e.date.month, e.date.day);
+        eventMap.putIfAbsent(day, () => []).add(e);
+      }
+      for (final e in dbEvents) addToMap(e);
+      for (final h in holidays) addToMap(h);
+      _cache[key] = eventMap;
+    } catch (_) {
+      // Prefetch fail → bỏ qua, sẽ load lại khi cần
+    }
+  }
+
+  /// Xóa cache của tháng khi có thay đổi (thêm/sửa/xóa event)
+  void _invalidateMonth(int year, int month) {
+    _cache.remove(_cacheKey(year, month));
   }
 
   Future<void> _onSelectDate(
     SelectDate event,
     Emitter<CalendarState> emit,
   ) async {
-    final day = DateTime(
-      event.date.year,
-      event.date.month,
-      event.date.day,
-    );
-    final selectedEvents = state.events[day] ?? [];
+    final day =
+        DateTime(event.date.year, event.date.month, event.date.day);
 
-    // Nếu sang tháng khác thì load lại
-    if (event.date.month != state.focusedMonth.month ||
-        event.date.year != state.focusedMonth.year) {
+    // Merge events hiện tại với tháng mới nếu cần
+    final needsLoad = event.date.month != state.focusedMonth.month ||
+        event.date.year != state.focusedMonth.year;
+
+    if (needsLoad) {
+      // Cập nhật selectedDate ngay (không đợi load)
+      emit(state.copyWith(
+        selectedDate: event.date,
+        selectedDateEvents: const [],
+        focusedMonth: event.date,
+      ));
+      // Load tháng mới
       add(LoadCalendarEvents(event.date));
+    } else {
+      emit(state.copyWith(
+        selectedDate: event.date,
+        selectedDateEvents: state.events[day] ?? [],
+      ));
     }
-
-    emit(state.copyWith(
-      selectedDate: event.date,
-      selectedDateEvents: selectedEvents,
-      focusedMonth: event.date,
-    ));
   }
 
   Future<void> _onAddEvent(
@@ -215,8 +264,8 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
     try {
       await _db.insertEvent(event.event);
       await _notifications.scheduleEventNotification(event.event);
-
-      // Reload
+      // Xóa cache tháng liên quan để force reload
+      _invalidateMonth(event.event.date.year, event.event.date.month);
       add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
@@ -231,7 +280,7 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
       await _db.updateEvent(event.event);
       await _notifications.cancelEventNotification(event.event.id);
       await _notifications.scheduleEventNotification(event.event);
-
+      _invalidateMonth(event.event.date.year, event.event.date.month);
       add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
@@ -245,7 +294,10 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
     try {
       await _db.deleteEvent(event.eventId);
       await _notifications.cancelEventNotification(event.eventId);
-
+      _invalidateMonth(
+        state.focusedMonth.year,
+        state.focusedMonth.month,
+      );
       add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {
       emit(state.copyWith(error: e.toString()));

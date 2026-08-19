@@ -280,7 +280,7 @@ class _MiniMonth extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
-        childAspectRatio: 1.0,
+        childAspectRatio: 0.85, // chiều cao > chiều rộng → đủ chỗ cho số + dot
         mainAxisSpacing: 0,
         crossAxisSpacing: 0,
       ),
@@ -324,65 +324,86 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWeekend =
-        date.weekday == DateTime.saturday ||
+    final isWeekend = date.weekday == DateTime.saturday ||
         date.weekday == DateTime.sunday;
 
     final hasHoliday = events.any((e) =>
-        e.type == EventType.holiday ||
-        e.type == EventType.lunarHoliday);
+        e.type == EventType.holiday || e.type == EventType.lunarHoliday);
 
     final hasPersonal = events.any((e) =>
-        e.type == EventType.personal ||
-        e.type == EventType.reminder);
+        e.type == EventType.personal || e.type == EventType.reminder);
 
-    // Màu số ngày
-    Color textColor;
-    if (isWeekend || hasHoliday) {
-      textColor = Colors.red;
-    } else {
-      textColor = theme.colorScheme.onSurface;
-    }
+    // Màu số ngày khi không có highlight
+    final Color textColor = (isWeekend || hasHoliday)
+        ? Colors.red
+        : theme.colorScheme.onSurface;
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.all(0.5),
-        decoration: BoxDecoration(
-          color: isToday
-              ? theme.colorScheme.primary
-              : Colors.transparent,
-          shape: BoxShape.circle,
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Text(
-              '${date.day}',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight:
-                    isToday ? FontWeight.bold : FontWeight.normal,
-                color: isToday ? Colors.white : textColor,
-                height: 1,
-              ),
-            ),
-            // Dot sự kiện cá nhân — góc dưới phải
-            if (hasPersonal && !isToday)
-              Positioned(
-                bottom: 1,
-                right: 1,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Vòng tròn highlight ngày hôm nay
+          Expanded(
+            child: Padding(
+              // Padding nhỏ để vòng tròn không chạm viền ô
+              padding: const EdgeInsets.all(1.5),
+              child: AspectRatio(
+                aspectRatio: 1,
                 child: Container(
-                  width: 3,
-                  height: 3,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.secondary,
+                    color: isToday
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
                     shape: BoxShape.circle,
+                    // Viền mảnh cho ngày lễ (không phải hôm nay)
+                    border: !isToday && hasHoliday
+                        ? Border.all(
+                            color: Colors.red.withOpacity(0.35),
+                            width: 0.8,
+                          )
+                        : null,
+                  ),
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isToday
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isToday ? Colors.white : textColor,
+                          height: 1,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+          ),
+          // Dot sự kiện — hàng riêng ngay dưới số
+          SizedBox(
+            height: 5,
+            child: hasPersonal
+                ? Center(
+                    child: Container(
+                      width: 3,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: isToday
+                            ? Colors.white.withOpacity(0.9)
+                            : theme.colorScheme.secondary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+        ],
       ),
     );
   }

@@ -4,164 +4,134 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../models/calendar_event.dart';
 
-// Android API level constants
-const int _androidQ = 29;   // Android 10 - fullScreenIntent
-const int _androidS = 31;   // Android 12 - SCHEDULE_EXACT_ALARM
-const int _androidT = 33;   // Android 13 - POST_NOTIFICATIONS runtime
+const int _androidQ = 29;
+const int _androidS = 31;
+const int _androidT = 33;
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
+  static final NotificationService _instance =
+      NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications =
+  final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
-  int _androidSdkVersion = 0; // cache để dùng nhiều lần
+  int _sdkVersion = 0;
+
+  // ─── Init ──────────────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
     if (_initialized) return;
 
-    // Lấy Android SDK version để guard các API mới
     if (Platform.isAndroid) {
       final info = await DeviceInfoPlugin().androidInfo;
-      _androidSdkVersion = info.version.sdkInt;
-      debugPrint('[NotificationService] Android SDK: $_androidSdkVersion');
+      _sdkVersion = info.version.sdkInt;
+      debugPrint('[Notif] Android SDK: $_sdkVersion');
     }
 
     tz.initializeTimeZones();
-    // Đặt múi giờ Việt Nam
     tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const ios = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
+    await _plugin.initialize(
+      const InitializationSettings(android: android, iOS: ios),
+      onDidReceiveNotificationResponse: _onTapped,
+      onDidReceiveBackgroundNotificationResponse: _onBgTapped,
     );
 
-    await _notifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-      onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationTapped,
-    );
-
-    // Tạo notification channel cho Android
-    await _createNotificationChannels();
-
+    await _createChannels();
     _initialized = true;
   }
 
-  Future<void> _createNotificationChannels() async {
-    final androidPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+  Future<void> _createChannels() async {
+    final ap = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (ap == null) return;
 
-    if (androidPlugin != null) {
-      // Channel cho sự kiện thông thường
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'event_channel',
-          'Nhắc nhở sự kiện',
-          description: 'Thông báo nhắc nhở các sự kiện trong lịch',
-          importance: Importance.high,
-          enableVibration: true,
-          playSound: true,
-          showBadge: true,
-        ),
-      );
+    // Channel sự kiện — high importance, âm thanh + rung + lock screen
+    await ap.createNotificationChannel(const AndroidNotificationChannel(
+      'event_channel',
+      'Nhắc nhở sự kiện',
+      description: 'Thông báo nhắc nhở các sự kiện trong lịch',
+      importance: Importance.high,
+      enableVibration: true,
+      playSound: true,
+      showBadge: true,
+      enableLights: true,
+      ledColor: Color(0xFF1565C0),
+    ));
 
-      // Channel cho ngày lễ
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'holiday_channel',
-          'Ngày lễ & Sự kiện đặc biệt',
-          description: 'Thông báo về các ngày lễ và sự kiện đặc biệt',
-          importance: Importance.defaultImportance,
-          enableVibration: false,
-          showBadge: true,
-        ),
-      );
-    }
+    // Channel ngày lễ
+    await ap.createNotificationChannel(const AndroidNotificationChannel(
+      'holiday_channel',
+      'Ngày lễ & Sự kiện đặc biệt',
+      description: 'Thông báo về các ngày lễ và sự kiện đặc biệt',
+      importance: Importance.defaultImportance,
+      enableVibration: true,
+      playSound: true,
+      showBadge: true,
+    ));
   }
 
-  static void _onNotificationTapped(NotificationResponse response) {
-    // Handle notification tap
-    debugPrint('Notification tapped: ${response.payload}');
-  }
+  static void _onTapped(NotificationResponse r) =>
+      debugPrint('[Notif] Tapped: ${r.payload}');
 
   @pragma('vm:entry-point')
-  static void _onBackgroundNotificationTapped(NotificationResponse response) {
-    debugPrint('Background notification tapped: ${response.payload}');
-  }
+  static void _onBgTapped(NotificationResponse r) =>
+      debugPrint('[Notif] BG tapped: ${r.payload}');
 
-  /// Yêu cầu quyền thông báo
-  /// - Android 9-12 (API 28-32): KHÔNG cần xin runtime permission, tự động granted
-  /// - Android 13+ (API 33+): Phải xin POST_NOTIFICATIONS
-  /// - iOS: Luôn phải xin
+  // ─── Permissions ───────────────────────────────────────────────────────────
+
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
-      // Android 9, 10, 11, 12 — không cần xin, luôn được phép
-      if (_androidSdkVersion < _androidT) {
-        debugPrint('[NotificationService] Android < 13, không cần xin quyền thông báo');
-        return true;
-      }
-      // Android 13+
-      final androidPlugin = _notifications
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      if (androidPlugin != null) {
-        final granted = await androidPlugin.requestNotificationsPermission();
-        return granted ?? false;
-      }
-      return true;
+      if (_sdkVersion < _androidT) return true; // API < 33 tự động granted
+      final ap = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await ap?.requestNotificationsPermission() ?? true;
     }
-
-    // iOS
-    final iosPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
-    if (iosPlugin != null) {
-      final granted = await iosPlugin.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      return granted ?? false;
-    }
-
-    return true;
+    final ip = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    return await ip?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        ) ??
+        true;
   }
 
-  /// Lên lịch thông báo cho một sự kiện
+  // ─── Schedule ──────────────────────────────────────────────────────────────
+
   Future<void> scheduleEventNotification(CalendarEvent event) async {
     if (!event.hasNotification) return;
 
-    final notifTime = _getNotificationTime(event);
-    if (notifTime == null) return;
+    final notifTime = _calcNotifTime(event);
+    if (notifTime == null) {
+      debugPrint('[Notif] ${event.title}: không tính được giờ thông báo');
+      return;
+    }
+    if (notifTime.isBefore(DateTime.now())) {
+      debugPrint('[Notif] ${event.title}: thời gian thông báo đã qua ($notifTime)');
+      return;
+    }
 
-    // Bỏ qua nếu thời gian đã qua
-    if (notifTime.isBefore(DateTime.now())) return;
+    debugPrint('[Notif] Schedule "${event.title}" lúc $notifTime');
 
     final tzTime = tz.TZDateTime.from(notifTime, tz.local);
-
     final isHoliday = event.type == EventType.holiday ||
         event.type == EventType.lunarHoliday;
 
-    // fullScreenIntent chỉ hỗ trợ Android 10+ (API 29+)
-    // Android 9 dùng thông báo thường thay thế
-    final useFullScreen = !isHoliday && _androidSdkVersion >= _androidQ;
-
-    final androidDetails = AndroidNotificationDetails(
+    final android = AndroidNotificationDetails(
       isHoliday ? 'holiday_channel' : 'event_channel',
       isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
       channelDescription: isHoliday
@@ -169,146 +139,161 @@ class NotificationService {
           : 'Thông báo nhắc nhở các sự kiện trong lịch',
       importance: isHoliday ? Importance.defaultImportance : Importance.high,
       priority: isHoliday ? Priority.defaultPriority : Priority.high,
+      // LOCK SCREEN: hiển thị đầy đủ nội dung trên màn hình khóa
+      visibility: NotificationVisibility.public,
       color: event.color,
+      // BigText style để hiện đủ nội dung
       styleInformation: BigTextStyleInformation(
-        event.description ?? '',
+        _buildBody(event),
         contentTitle: event.title,
         summaryText: 'Lịch Việt',
+        htmlFormatBigText: false,
       ),
-      category: isHoliday
-          ? AndroidNotificationCategory.event
-          : AndroidNotificationCategory.reminder,
-      fullScreenIntent: useFullScreen,
+      category: AndroidNotificationCategory.reminder,
+      // fullScreenIntent: bật chuông + hiển thị kể cả khi màn hình tắt
+      fullScreenIntent: !isHoliday && _sdkVersion >= _androidQ,
+      // Âm thanh + rung
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
       icon: '@mipmap/ic_launcher',
+      largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      // Không auto-cancel để user không bỏ lỡ
+      autoCancel: true,
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    const ios = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
-      interruptionLevel: InterruptionLevel.active,
+      interruptionLevel: InterruptionLevel.timeSensitive,
     );
 
-    final details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
+    final scheduleMode = await _getScheduleMode();
 
-    // Android 9-11: exactAllowWhileIdle hoạt động bình thường, không cần permission
-    // Android 12+: cần SCHEDULE_EXACT_ALARM permission
-    // Nếu không có permission (user từ chối), fallback sang inexact (sai giờ tối đa 15p)
-    AndroidScheduleMode scheduleMode;
-    if (_androidSdkVersion >= _androidS) {
-      final androidPlugin = _notifications
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      final canScheduleExact =
-          await androidPlugin?.canScheduleExactNotifications() ?? false;
-      scheduleMode = canScheduleExact
-          ? AndroidScheduleMode.exactAllowWhileIdle
-          : AndroidScheduleMode.inexactAllowWhileIdle;
-    } else {
-      // Android 9, 10, 11 — exact luôn hoạt động
-      scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
-    }
+    // FIX: ID phải dương — dùng abs() + tránh trùng
+    final notifId = event.id.hashCode.abs() % 2147483647;
 
-    await _notifications.zonedSchedule(
-      event.id.hashCode,
+    await _plugin.zonedSchedule(
+      notifId,
       event.title,
-      _buildNotificationBody(event),
+      _buildBody(event),
       tzTime,
-      details,
+      NotificationDetails(android: android, iOS: ios),
       androidScheduleMode: scheduleMode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       payload: event.id,
     );
+
+    debugPrint('[Notif] ✅ Scheduled id=$notifId cho "${event.title}" lúc $tzTime');
   }
 
-  /// Hủy thông báo của một sự kiện
+  Future<AndroidScheduleMode> _getScheduleMode() async {
+    if (_sdkVersion >= _androidS) {
+      final ap = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final canExact = await ap?.canScheduleExactNotifications() ?? false;
+      return canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
+  // ─── Cancel ────────────────────────────────────────────────────────────────
+
   Future<void> cancelEventNotification(String eventId) async {
-    await _notifications.cancel(eventId.hashCode);
+    final id = eventId.hashCode.abs() % 2147483647;
+    await _plugin.cancel(id);
+    debugPrint('[Notif] Cancelled id=$id');
   }
 
-  /// Hủy tất cả thông báo
   Future<void> cancelAllNotifications() async {
-    await _notifications.cancelAll();
+    await _plugin.cancelAll();
   }
 
-  /// Hiển thị thông báo ngay lập tức (để test)
+  // ─── Instant (test) ────────────────────────────────────────────────────────
+
   Future<void> showInstantNotification({
     required String title,
     required String body,
     Color color = const Color(0xFF2196F3),
   }) async {
-    final androidDetails = AndroidNotificationDetails(
+    final android = AndroidNotificationDetails(
       'event_channel',
       'Nhắc nhở sự kiện',
       importance: Importance.high,
       priority: Priority.high,
+      visibility: NotificationVisibility.public,
       color: color,
+      playSound: true,
+      enableVibration: true,
+      fullScreenIntent: _sdkVersion >= _androidQ,
     );
-
-    const iosDetails = DarwinNotificationDetails(
+    const ios = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      interruptionLevel: InterruptionLevel.active,
     );
-
-    await _notifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+    await _plugin.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
       title,
       body,
-      NotificationDetails(android: androidDetails, iOS: iosDetails),
+      NotificationDetails(android: android, iOS: ios),
     );
   }
 
-  DateTime? _getNotificationTime(CalendarEvent event) {
-    final eventDate = event.date;
+  // ─── Time calculation ──────────────────────────────────────────────────────
+
+  /// FIX: Tính đúng giờ thông báo cho mọi loại sự kiện
+  DateTime? _calcNotifTime(CalendarEvent event) {
+    final d = event.date;
+    final minsBefore = event.notificationMinutesBefore ?? 30;
+
     if (event.isAllDay) {
-      // Thông báo lúc 8:00 sáng ngày hôm đó hoặc ngày hôm trước
-      final minutesBefore = event.notificationMinutesBefore ?? 60 * 24;
-      return DateTime(
-        eventDate.year,
-        eventDate.month,
-        eventDate.day,
-        8,
-        0,
-      ).subtract(Duration(minutes: minutesBefore - 8 * 60));
+      // Sự kiện cả ngày → thông báo lúc 8:00 sáng ngày đó
+      // Nếu minsBefore >= 1440 (1 ngày) → thông báo 8:00 sáng hôm trước
+      final notifDay = minsBefore >= 1440
+          ? DateTime(d.year, d.month, d.day - 1, 8, 0)
+          : DateTime(d.year, d.month, d.day, 8, 0);
+      return notifDay;
     }
 
     if (event.startTime != null) {
-      final eventDateTime = DateTime(
-        eventDate.year,
-        eventDate.month,
-        eventDate.day,
+      // Sự kiện có giờ → thông báo trước N phút
+      final start = DateTime(
+        d.year, d.month, d.day,
         event.startTime!.hour,
         event.startTime!.minute,
       );
-      return eventDateTime.subtract(
-        Duration(minutes: event.notificationMinutesBefore ?? 30),
-      );
+      return start.subtract(Duration(minutes: minsBefore));
     }
 
-    return null;
+    // Sự kiện không có giờ, không phải allDay
+    // → thông báo lúc 8:00 sáng ngày đó
+    return DateTime(d.year, d.month, d.day, 8, 0);
   }
 
-  String _buildNotificationBody(CalendarEvent event) {
+  String _buildBody(CalendarEvent event) {
     if (event.description != null && event.description!.isNotEmpty) {
       return event.description!;
     }
-
-    if (event.isAllDay) {
-      return 'Sự kiện cả ngày hôm nay';
-    }
-
+    if (event.isAllDay) return 'Sự kiện cả ngày';
     if (event.startTime != null) {
       final h = event.startTime!.hour.toString().padLeft(2, '0');
       final m = event.startTime!.minute.toString().padLeft(2, '0');
       final mins = event.notificationMinutesBefore ?? 30;
-      return 'Bắt đầu lúc $h:$m (còn $mins phút)';
+      return 'Bắt đầu lúc $h:$m${mins > 0 ? ' (còn $mins phút)' : ''}';
     }
-
     return 'Nhắc nhở sự kiện';
+  }
+
+  // ─── Debug ─────────────────────────────────────────────────────────────────
+
+  /// Liệt kê các thông báo đã lên lịch (debug)
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    return await _plugin.pendingNotificationRequests();
   }
 }

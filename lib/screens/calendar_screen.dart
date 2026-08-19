@@ -181,6 +181,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
           },
           itemBuilder: (_) => const [
             PopupMenuItem(
+              value: 'year',
+              child: Row(children: [
+                Icon(Icons.calendar_today_outlined),
+                SizedBox(width: 8),
+                Text('Năm'),
+              ]),
+            ),
+            PopupMenuItem(
               value: 'month',
               child: Row(children: [
                 Icon(Icons.calendar_view_month),
@@ -202,14 +210,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Icon(Icons.calendar_view_day),
                 SizedBox(width: 8),
                 Text('Ngày'),
-              ]),
-            ),
-            PopupMenuItem(
-              value: 'year',
-              child: Row(children: [
-                Icon(Icons.calendar_today_outlined),
-                SizedBox(width: 8),
-                Text('Năm'),
               ]),
             ),
           ],

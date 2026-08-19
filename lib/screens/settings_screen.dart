@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/notification_provider.dart';
+import '../services/calendar_bloc.dart';
+import 'manage_events_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -52,7 +55,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             bottom: 72 + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
-            _header('🔔 Thông báo'),
+            _header('📋 Sự kiện của tôi'),
+          ListTile(
+            leading:
+                const Icon(Icons.event_note, color: Colors.blue),
+            title: const Text('Quản lý sự kiện'),
+            subtitle: const Text(
+                'Xem, sửa và xóa sự kiện đã tạo'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BlocProvider.value(
+                  value: context.read<CalendarBloc>(),
+                  child: const ManageEventsScreen(),
+                ),
+              ),
+            ),
+          ),
+
+          _header('🔔 Thông báo'),
           SwitchListTile(
             value: _notifyHolidays,
             onChanged: (v) {

@@ -12,6 +12,7 @@ import '../widgets/lunar_info_widget.dart';
 import '../widgets/notification_provider.dart';
 import 'add_event_screen.dart';
 import 'day_view_screen.dart';
+import 'year_view_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -164,6 +165,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               _openDayView(context, state.selectedDate);
               return;
             }
+            if (value == 'year') {
+              _openYearView(context, _focusedDay.year);
+              return;
+            }
             final format = value == 'week'
                 ? CalendarFormat.week
                 : CalendarFormat.month;
@@ -197,6 +202,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Icon(Icons.calendar_view_day),
                 SizedBox(width: 8),
                 Text('Ngày'),
+              ]),
+            ),
+            PopupMenuItem(
+              value: 'year',
+              child: Row(children: [
+                Icon(Icons.calendar_today_outlined),
+                SizedBox(width: 8),
+                Text('Năm'),
               ]),
             ),
           ],
@@ -507,6 +520,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   // ─── Navigation & actions ────────────────────────────────────────────────
+
+  void _openYearView(BuildContext context, int year) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<CalendarBloc>(),
+          child: YearViewScreen(initialYear: year),
+        ),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      final bloc = context.read<CalendarBloc>();
+      bloc.add(LoadCalendarEvents(bloc.state.focusedMonth));
+      // Sync focusedDay với selectedDate sau khi trở về
+      setState(() => _focusedDay = bloc.state.selectedDate);
+    });
+  }
 
   void _openDayView(BuildContext context, DateTime date) {
     Navigator.push(

@@ -5,7 +5,6 @@ import '../services/calendar_bloc.dart';
 import '../models/calendar_event.dart';
 import '../utils/lunar_converter.dart';
 import '../widgets/event_detail_sheet.dart';
-import '../widgets/notification_provider.dart';
 import 'add_event_screen.dart';
 
 class DayViewScreen extends StatefulWidget {

@@ -166,8 +166,8 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
         final day = DateTime(e.date.year, e.date.month, e.date.day);
         eventMap.putIfAbsent(day, () => []).add(e);
       }
-      for (final e in dbEvents) addToMap(e);
-      for (final h in holidays) addToMap(h);
+      for (final e in dbEvents) { addToMap(e); }
+      for (final h in holidays) { addToMap(h); }
 
       // Lưu cache
       _cache[key] = eventMap;
@@ -216,8 +216,8 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
         final day = DateTime(e.date.year, e.date.month, e.date.day);
         eventMap.putIfAbsent(day, () => []).add(e);
       }
-      for (final e in dbEvents) addToMap(e);
-      for (final h in holidays) addToMap(h);
+      for (final e in dbEvents) { addToMap(e); }
+      for (final h in holidays) { addToMap(h); }
       _cache[key] = eventMap;
     } catch (_) {
       // Prefetch fail → bỏ qua, sẽ load lại khi cần

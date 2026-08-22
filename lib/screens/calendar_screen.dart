@@ -319,7 +319,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 fontWeight: FontWeight.w600),
           ),
 
-          rowHeight: 58,
+          rowHeight: 62,
         ),
       ),
     );
@@ -355,18 +355,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final dotColors = dayEvents.take(3).map((e) => e.color).toList();
 
     return Container(
-      margin: const EdgeInsets.all(3),
+      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
       decoration: BoxDecoration(
         color: isSelected
             ? theme.colorScheme.primary
             : isToday
-                ? theme.colorScheme.primary.withOpacity(0.12)
+                ? theme.colorScheme.primary.withOpacity(0.15)
                 : Colors.transparent,
-        shape: BoxShape.circle,
+        // Stadium shape (viên thuốc) bao trọn cả số DL + ÂL
+        borderRadius: BorderRadius.circular(12),
+        // Viền nổi bật cho ngày hôm nay (không phải selected)
+        border: isToday && !isSelected
+            ? Border.all(
+                color: theme.colorScheme.primary,
+                width: 1.5,
+              )
+            : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(height: 3),
           Text(
             '${day.day}',
             style: TextStyle(
@@ -384,7 +394,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 : '${lunar.day}',
             style: TextStyle(
               color: isSelected
-                  ? Colors.white.withOpacity(0.75)
+                  ? Colors.white.withOpacity(0.8)
                   : numColor.withOpacity(0.55),
               fontSize: 7.5,
               height: 1.1,
@@ -392,7 +402,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           if (dotColors.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 1),
+              padding: const EdgeInsets.only(top: 2, bottom: 1),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -410,6 +420,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     .toList(),
               ),
             ),
+          const SizedBox(height: 3),
         ],
       ),
     );

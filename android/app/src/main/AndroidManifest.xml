@@ -1,20 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Thông báo: Android 9-12 tự động granted, Android 13+ cần xin runtime -->
+    <!-- ── Thông báo cơ bản ───────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- Android 13+ (API 33+) -->
+    <!-- ── FIX #1: Tắt tối ưu pin (Doze mode) ───────────────────────────── -->
+    <!-- Bắt buộc để alarm hoạt động khi màn hình tắt trên mọi Android        -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+
+    <!-- ── FIX #2: Full-screen intent (hiện trên màn hình khóa) ─────────── -->
+    <!-- Android 14+ (API 34+) cần permission riêng                           -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+
+    <!-- ── FIX #3: Foreground service cho full-screen notification ─────────── -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        android:minSdkVersion="34"/>
+
+    <!-- Android 13+ (API 33+): xin runtime permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
         android:minSdkVersion="33"/>
 
-    <!-- Android 12+ (API 31+) -->
+    <!-- Android 12+ (API 31+): đặt alarm chính xác -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:minSdkVersion="31"/>
+    <!-- Android 13+ (API 33+): thay thế SCHEDULE_EXACT_ALARM -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"
         android:minSdkVersion="33"/>
 
@@ -33,6 +46,7 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
+            android:showOnLockScreen="true"
             android:windowSoftInputMode="adjustResize">
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -43,7 +57,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Khôi phục thông báo sau khi restart máy -->
+        <!-- Receiver khôi phục thông báo sau khi khởi động lại -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false">
@@ -55,12 +69,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver kích hoạt alarm đúng giờ -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
 
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2"/>
+        <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>
 </manifest>

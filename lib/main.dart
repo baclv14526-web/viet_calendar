@@ -3,10 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io';
 import 'services/calendar_bloc.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
@@ -44,18 +41,8 @@ void main() async {
 }
 
 Future<void> _requestPermissions(NotificationService ns) async {
-  await ns.requestPermission();
-
-  if (Platform.isAndroid) {
-    final info = await DeviceInfoPlugin().androidInfo;
-    final sdkInt = info.version.sdkInt;
-    if (sdkInt >= 31) {
-      final status = await Permission.scheduleExactAlarm.status;
-      if (status.isDenied) {
-        await Permission.scheduleExactAlarm.request();
-      }
-    }
-  }
+  // requestAllPermissions xử lý toàn bộ: notification + exactAlarm + battery
+  await ns.requestAllPermissions();
 }
 
 class VietCalendarApp extends StatelessWidget {

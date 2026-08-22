@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/app_settings.dart';
 import '../widgets/notification_provider.dart';
 import '../services/calendar_bloc.dart';
 import 'manage_events_screen.dart';
@@ -117,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _showLunarOnCalendar,
             onChanged: (v) {
               setState(() => _showLunarOnCalendar = v);
-              _save('show_lunar', v);
+              AppSettings().setShowLunar(v); // cập nhật ValueNotifier ngay lập tức
             },
             title: const Text('Hiển thị ngày âm lịch'),
             subtitle: const Text('Hiển thị ngày âm lịch trong ô lịch'),

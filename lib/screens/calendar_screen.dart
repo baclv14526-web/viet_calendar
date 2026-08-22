@@ -6,6 +6,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import '../services/calendar_bloc.dart';
 import '../models/calendar_event.dart';
 import '../utils/lunar_converter.dart';
+import '../utils/app_settings.dart';
 import '../widgets/event_card.dart';
 import '../widgets/event_detail_sheet.dart';
 import '../widgets/lunar_info_widget.dart';
@@ -22,9 +23,6 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  // focusedDay do local state quản lý — KHÔNG lấy từ BLoC
-  // Đây là fix chính cho bug giật: TableCalendar.focusedDay không bị
-  // reset bởi BLoC rebuild trong khi animation đang chạy
   late DateTime _focusedDay;
   late CalendarFormat _calendarFormat;
 
@@ -52,15 +50,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
             builder: (ctx, state) => _buildSliverAppBar(ctx, state),
           ),
 
-          // TableCalendar chỉ rebuild khi events hoặc selectedDate thay đổi
-          // KHÔNG rebuild khi focusedMonth thay đổi vì focusedDay là local
+          // TableCalendar rebuild khi events, selectedDate, viewMode, hoặc showLunar thay đổi
           BlocBuilder<CalendarBloc, CalendarState>(
             buildWhen: (prev, curr) =>
                 prev.events != curr.events ||
                 prev.selectedDate != curr.selectedDate ||
                 prev.viewMode != curr.viewMode,
-            builder: (ctx, state) => SliverToBoxAdapter(
-              child: _buildCalendar(ctx, state),
+            builder: (ctx, state) => ValueListenableBuilder<bool>(
+              valueListenable: AppSettings().showLunar,
+              builder: (ctx, showLunar, _) => SliverToBoxAdapter(
+                child: _buildCalendar(ctx, state, showLunar),
+              ),
             ),
           ),
 
@@ -224,7 +224,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // ─── Calendar ────────────────────────────────────────────────────────────
 
-  Widget _buildCalendar(BuildContext context, CalendarState state) {
+  Widget _buildCalendar(BuildContext context, CalendarState state, bool showLunar) {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -273,11 +273,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
           // Dots vẽ trong _dayCell bằng Column thông thường
           calendarBuilders: CalendarBuilders(
             defaultBuilder: (ctx, day, _) =>
-                _dayCell(ctx, day, state, false, false),
+                _dayCell(ctx, day, state, false, false, showLunar),
             todayBuilder: (ctx, day, _) =>
-                _dayCell(ctx, day, state, false, true),
+                _dayCell(ctx, day, state, false, true, showLunar),
             selectedBuilder: (ctx, day, _) =>
-                _dayCell(ctx, day, state, true, false),
+                _dayCell(ctx, day, state, true, false, showLunar),
             markerBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
 
@@ -319,7 +319,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 fontWeight: FontWeight.w600),
           ),
 
-          rowHeight: 62,
+          rowHeight: showLunar ? 62 : 48,
         ),
       ),
     );
@@ -354,17 +354,48 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     final dotColors = dayEvents.take(3).map((e) => e.color).toList();
 
+  Widget _dayCell(
+    BuildContext context,
+    DateTime day,
+    CalendarState state,
+    bool isSelected,
+    bool isToday,
+    bool showLunar,
+  ) {
+    final theme = Theme.of(context);
+    final lunar = showLunar ? LunarConverter.solarToLunar(day) : null;
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    final key = DateTime(day.year, day.month, day.day);
+    final dayEvents = state.events[key] ?? [];
+    final hasHoliday = dayEvents.any((e) =>
+        e.type == EventType.holiday || e.type == EventType.lunarHoliday);
+
+    Color numColor;
+    if (isSelected) {
+      numColor = Colors.white;
+    } else if (isWeekend || hasHoliday) {
+      numColor = const Color(0xFFE53935);
+    } else {
+      numColor = theme.colorScheme.onSurface;
+    }
+
+    final dotColors = dayEvents.take(3).map((e) => e.color).toList();
+
+    // Bán kính bo góc: đủ tròn để bao trọn nội dung
+    // Khi có âm lịch (2 dòng) → bo nhiều hơn để thành hình oval
+    // Khi chỉ có 1 dòng → gần như hình tròn
+    final radius = showLunar ? 10.0 : 20.0;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
       decoration: BoxDecoration(
         color: isSelected
             ? theme.colorScheme.primary
             : isToday
-                ? theme.colorScheme.primary.withOpacity(0.15)
+                ? theme.colorScheme.primary.withOpacity(0.13)
                 : Colors.transparent,
-        // Stadium shape (viên thuốc) bao trọn cả số DL + ÂL
-        borderRadius: BorderRadius.circular(12),
-        // Viền nổi bật cho ngày hôm nay (không phải selected)
+        borderRadius: BorderRadius.circular(radius),
         border: isToday && !isSelected
             ? Border.all(
                 color: theme.colorScheme.primary,
@@ -377,6 +408,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 3),
+          // Số dương lịch
           Text(
             '${day.day}',
             style: TextStyle(
@@ -385,24 +417,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
               fontWeight: isSelected || isToday
                   ? FontWeight.bold
                   : FontWeight.normal,
-              height: 1.1,
+              height: 1.15,
             ),
           ),
-          Text(
-            lunar.day == 1
-                ? '${lunar.day}/${lunar.month}'
-                : '${lunar.day}',
-            style: TextStyle(
-              color: isSelected
-                  ? Colors.white.withOpacity(0.8)
-                  : numColor.withOpacity(0.55),
-              fontSize: 7.5,
-              height: 1.1,
+          // Số âm lịch (ẩn nếu setting tắt)
+          if (showLunar && lunar != null)
+            Text(
+              lunar.day == 1
+                  ? '${lunar.day}/${lunar.month}'
+                  : '${lunar.day}',
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.8)
+                    : numColor.withOpacity(0.55),
+                fontSize: 7.5,
+                height: 1.15,
+              ),
             ),
-          ),
+          // Dots sự kiện
           if (dotColors.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 1),
+              padding: const EdgeInsets.only(top: 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -662,4 +697,5 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
+}
 }

@@ -8,6 +8,7 @@ import 'services/calendar_bloc.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
+import 'utils/app_settings.dart';
 import 'widgets/notification_provider.dart';
 
 void main() async {
@@ -15,6 +16,7 @@ void main() async {
 
   // Locale tiếng Việt cho intl / DateFormat
   await initializeDateFormatting('vi_VN', null);
+  await AppSettings().load(); // Load settings trước khi runApp
 
   // Edge-to-edge: app vẽ dưới status bar + navigation bar
   // Hoạt động đúng trên Android 9+ (API 28+)

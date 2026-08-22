@@ -74,6 +74,21 @@
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
 
+        <!--
+            FIX Android 14+: FOREGROUND_SERVICE_SPECIAL_USE yêu cầu khai báo
+            <service> với android:foregroundServiceType="specialUse"
+            Không có khai báo này → SecurityException khi dùng fullScreenIntent
+        -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="alarm"/>
+        </service>
+
         <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>
 </manifest>

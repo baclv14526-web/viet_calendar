@@ -58,17 +58,15 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (ap == null) return;
 
-    // Xóa channel cũ để tạo lại với đúng importance
-    // (Android không cho update importance sau khi tạo)
-    await ap.deleteNotificationChannel('event_channel');
-    await ap.deleteNotificationChannel('holiday_channel');
+    // KHÔNG xóa channel cũ vì sẽ hủy hết pending notifications
+    // Thay vào đó tạo với ID mới (v2) mỗi khi cần nâng importance
+    // User chỉ cần cài lại app là channel v1 cũ biến mất tự nhiên
 
-    // Channel sự kiện: HIGH importance để hiện banner + âm thanh + màn hình khóa
     await ap.createNotificationChannel(const AndroidNotificationChannel(
-      'event_channel',
+      'event_channel_v2', // v2 để tránh bị cache importance thấp từ lần cài trước
       'Nhắc nhở sự kiện',
       description: 'Thông báo nhắc nhở các sự kiện trong lịch',
-      importance: Importance.high, // HIGH = hiện banner, phát âm, rung
+      importance: Importance.high,
       enableVibration: true,
       playSound: true,
       showBadge: true,
@@ -76,9 +74,8 @@ class NotificationService {
       ledColor: Color(0xFF1565C0),
     ));
 
-    // Channel ngày lễ: DEFAULT importance
     await ap.createNotificationChannel(const AndroidNotificationChannel(
-      'holiday_channel',
+      'holiday_channel_v2',
       'Ngày lễ & Sự kiện đặc biệt',
       description: 'Thông báo về các ngày lễ và sự kiện đặc biệt',
       importance: Importance.defaultImportance,
@@ -87,7 +84,7 @@ class NotificationService {
       showBadge: true,
     ));
 
-    debugPrint('[Notif] Channels recreated');
+    debugPrint('[Notif] Channels ready');
   }
 
   static void _onTapped(NotificationResponse r) =>
@@ -151,11 +148,10 @@ class NotificationService {
     }
 
     // 4. USE_FULL_SCREEN_INTENT (Android 14+)
+    // Dùng permission_handler để check, không có API riêng trong flutter_local_notifications
     if (_sdkVersion >= 34) {
-      final ap = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      result['fullScreen'] =
-          await ap?.canScheduleExactNotifications() ?? false;
+      final status = await Permission.systemAlertWindow.status;
+      result['fullScreen'] = status.isGranted;
     } else {
       result['fullScreen'] = true;
     }
@@ -231,7 +227,7 @@ class NotificationService {
     final body = _buildBody(event);
 
     final android = AndroidNotificationDetails(
-      isHoliday ? 'holiday_channel' : 'event_channel',
+      isHoliday ? 'holiday_channel_v2' : 'event_channel_v2',
       isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
       importance: isHoliday ? Importance.defaultImportance : Importance.high,
       priority: isHoliday ? Priority.defaultPriority : Priority.high,
@@ -285,7 +281,7 @@ class NotificationService {
     final mode = await _scheduleMode();
 
     const android = AndroidNotificationDetails(
-      'event_channel',
+      'event_channel_v2',
       'Nhắc nhở sự kiện',
       importance: Importance.high,
       priority: Priority.high,
@@ -348,7 +344,7 @@ class NotificationService {
     Color color = const Color(0xFF2196F3),
   }) async {
     final android = AndroidNotificationDetails(
-      'event_channel',
+      'event_channel_v2',
       'Nhắc nhở sự kiện',
       importance: Importance.high,
       priority: Priority.high,

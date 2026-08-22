@@ -1,5 +1,6 @@
-# Flutter local notifications
+# Flutter local notifications - keep tất cả classes
 -keep class com.dexterous.** { *; }
+-dontwarn com.dexterous.**
 
 # SQFLite
 -keep class io.flutter.plugins.** { *; }

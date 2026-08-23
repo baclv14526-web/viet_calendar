@@ -202,6 +202,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _showNotificationDiagnostic(BuildContext context) async {
     final ns = NotificationServiceProvider.of(context).service;
+    // Lưu messenger TRƯỚC các await - đây là cách đúng để tránh lỗi context synchronously
+    final messenger = ScaffoldMessenger.of(context);
+
     final perms = await ns.checkPermissions();
     final pending = await ns.getPendingNotifications();
     if (!mounted) return;
@@ -246,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.pop(ctx);
                   await ns.requestAllPermissions();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                         const SnackBar(content: Text('Đã yêu cầu quyền')));
                   }
                 },
@@ -281,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.pop(ctx);
                   await ns.scheduleTestIn5Seconds();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    messenger.showSnackBar(const SnackBar(
                       content: Text(
                         '⏱ Chờ 5 giây — nếu không thấy thông báo: '
                         'quyền Báo thức hoặc Pin chưa được cấp!',

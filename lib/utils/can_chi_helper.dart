@@ -148,8 +148,6 @@ class CanChiHelper {
   static int weekOfYear(DateTime date) {
     final startOfYear = DateTime(date.year, 1, 1);
     final dayOfYearVal = date.difference(startOfYear).inDays;
-    // ISO week: tuần bắt đầu từ thứ Hai
-    final weekday = date.weekday; // 1=Mon…7=Sun
     return ((dayOfYearVal + startOfYear.weekday - 1) ~/ 7) + 1;
   }
 

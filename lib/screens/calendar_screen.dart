@@ -34,6 +34,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     context.read<CalendarBloc>().add(LoadCalendarEvents(_focusedDay));
   }
 
+  // ─── Build ───────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = 72 + MediaQuery.paddingOf(context).bottom;
@@ -42,20 +44,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: CustomScrollView(
         slivers: [
-          // AppBar chỉ rebuild khi focusedMonth hoặc viewMode thay đổi
           BlocBuilder<CalendarBloc, CalendarState>(
-            buildWhen: (prev, curr) =>
-                prev.focusedMonth != curr.focusedMonth ||
-                prev.viewMode != curr.viewMode,
+            buildWhen: (p, c) =>
+                p.focusedMonth != c.focusedMonth || p.viewMode != c.viewMode,
             builder: (ctx, state) => _buildSliverAppBar(ctx, state),
           ),
-
-          // TableCalendar rebuild khi events, selectedDate, viewMode, hoặc showLunar thay đổi
           BlocBuilder<CalendarBloc, CalendarState>(
-            buildWhen: (prev, curr) =>
-                prev.events != curr.events ||
-                prev.selectedDate != curr.selectedDate ||
-                prev.viewMode != curr.viewMode,
+            buildWhen: (p, c) =>
+                p.events != c.events ||
+                p.selectedDate != c.selectedDate ||
+                p.viewMode != c.viewMode,
             builder: (ctx, state) => ValueListenableBuilder<bool>(
               valueListenable: AppSettings().showLunar,
               builder: (ctx, showLunar, _) => SliverToBoxAdapter(
@@ -63,39 +61,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
-
-          // LunarInfo chỉ rebuild khi selectedDate thay đổi
           BlocBuilder<CalendarBloc, CalendarState>(
-            buildWhen: (prev, curr) =>
-                prev.selectedDate != curr.selectedDate,
+            buildWhen: (p, c) => p.selectedDate != c.selectedDate,
             builder: (ctx, state) => SliverToBoxAdapter(
               child: LunarInfoWidget(date: state.selectedDate),
             ),
           ),
-
-          // Danh sách sự kiện rebuild khi selectedDateEvents thay đổi
           BlocBuilder<CalendarBloc, CalendarState>(
-            buildWhen: (prev, curr) =>
-                prev.selectedDate != curr.selectedDate ||
-                prev.selectedDateEvents != curr.selectedDateEvents,
+            buildWhen: (p, c) =>
+                p.selectedDate != c.selectedDate ||
+                p.selectedDateEvents != c.selectedDateEvents,
             builder: (ctx, state) => SliverToBoxAdapter(
               child: _buildEventListHeader(ctx, state),
             ),
           ),
-
           BlocBuilder<CalendarBloc, CalendarState>(
-            buildWhen: (prev, curr) =>
-                prev.selectedDateEvents != curr.selectedDateEvents,
+            buildWhen: (p, c) =>
+                p.selectedDateEvents != c.selectedDateEvents,
             builder: (ctx, state) => _buildEventList(ctx, state),
           ),
-
-          SliverPadding(
-              padding: EdgeInsets.only(bottom: bottomInset + 72)),
+          SliverPadding(padding: EdgeInsets.only(bottom: bottomInset + 72)),
         ],
       ),
       floatingActionButton: BlocBuilder<CalendarBloc, CalendarState>(
-        buildWhen: (prev, curr) =>
-            prev.selectedDate != curr.selectedDate,
+        buildWhen: (p, c) => p.selectedDate != c.selectedDate,
         builder: (ctx, state) => Padding(
           padding: EdgeInsets.only(bottom: bottomInset - 64),
           child: FloatingActionButton.extended(
@@ -115,9 +104,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   SliverAppBar _buildSliverAppBar(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
-    // Dùng _focusedDay (local) cho title để sync với TableCalendar
-    final displayMonth = _focusedDay;
-
     return SliverAppBar(
       expandedHeight: 0,
       floating: false,
@@ -132,16 +118,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Lịch Việt',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold),
-              ),
+              const Text('Lịch Việt',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
               Text(
-                DateFormat('MMMM yyyy', 'vi_VN').format(displayMonth),
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                DateFormat('MMMM yyyy', 'vi_VN').format(_focusedDay),
+                style:
+                    const TextStyle(color: Colors.white70, fontSize: 11),
               ),
             ],
           ),
@@ -153,7 +138,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           tooltip: 'Hôm nay',
           onPressed: () {
             final now = DateTime.now();
-            // Cập nhật local focusedDay trước → không giật
             setState(() => _focusedDay = now);
             context.read<CalendarBloc>().add(SelectDate(now));
           },
@@ -224,7 +208,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   // ─── Calendar ────────────────────────────────────────────────────────────
 
-  Widget _buildCalendar(BuildContext context, CalendarState state, bool showLunar) {
+  Widget _buildCalendar(
+      BuildContext context, CalendarState state, bool showLunar) {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -236,41 +221,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
           locale: 'vi_VN',
           firstDay: DateTime.utc(2000, 1, 1),
           lastDay: DateTime.utc(2050, 12, 31),
-
-          // KEY FIX: focusedDay từ local state, không từ BLoC
-          // → TableCalendar hoàn toàn kiểm soát animation page của nó
           focusedDay: _focusedDay,
-
-          selectedDayPredicate: (day) =>
-              isSameDay(day, state.selectedDate),
+          selectedDayPredicate: (day) => isSameDay(day, state.selectedDate),
           calendarFormat: _calendarFormat,
-
           eventLoader: (day) {
             final key = DateTime(day.year, day.month, day.day);
             return state.events[key] ?? [];
           },
-
           onDaySelected: (selectedDay, focusedDay) {
-            // Cập nhật local state trước → UI phản hồi tức thì
             setState(() => _focusedDay = focusedDay);
             context.read<CalendarBloc>().add(SelectDate(selectedDay));
           },
-
           onDayLongPressed: (selectedDay, focusedDay) {
             _openDayView(context, selectedDay);
           },
-
           onPageChanged: (focusedDay) {
-            // Cập nhật local state trước → header title sync ngay
             setState(() => _focusedDay = focusedDay);
-            // Load data tháng mới (BLoC có cache, không blink)
             context
                 .read<CalendarBloc>()
                 .add(LoadCalendarEvents(focusedDay));
           },
-
-          // Bỏ calendarBuilders.markerBuilder → không dùng Positioned
-          // Dots vẽ trong _dayCell bằng Column thông thường
           calendarBuilders: CalendarBuilders(
             defaultBuilder: (ctx, day, _) =>
                 _dayCell(ctx, day, state, false, false, showLunar),
@@ -280,7 +250,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _dayCell(ctx, day, state, true, false, showLunar),
             markerBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
-
           calendarStyle: const CalendarStyle(
             outsideDaysVisible: false,
             defaultDecoration: BoxDecoration(),
@@ -293,7 +262,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             cellMargin: EdgeInsets.zero,
             cellPadding: EdgeInsets.zero,
           ),
-
           headerStyle: HeaderStyle(
             formatButtonVisible: false,
             titleCentered: true,
@@ -307,7 +275,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Icon(Icons.chevron_right, color: theme.colorScheme.primary),
             headerPadding: const EdgeInsets.symmetric(vertical: 8),
           ),
-
           daysOfWeekStyle: DaysOfWeekStyle(
             weekdayStyle: TextStyle(
                 color: theme.colorScheme.onSurface.withOpacity(0.6),
@@ -318,7 +285,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w600),
           ),
-
           rowHeight: showLunar ? 62 : 48,
         ),
       ),
@@ -326,33 +292,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   // ─── Day cell ────────────────────────────────────────────────────────────
-
-  Widget _dayCell(
-    BuildContext context,
-    DateTime day,
-    CalendarState state,
-    bool isSelected,
-    bool isToday,
-  ) {
-    final theme = Theme.of(context);
-    final lunar = LunarConverter.solarToLunar(day);
-    final isWeekend =
-        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
-    final key = DateTime(day.year, day.month, day.day);
-    final dayEvents = state.events[key] ?? [];
-    final hasHoliday = dayEvents.any((e) =>
-        e.type == EventType.holiday || e.type == EventType.lunarHoliday);
-
-    Color numColor;
-    if (isSelected) {
-      numColor = Colors.white;
-    } else if (isWeekend || hasHoliday) {
-      numColor = const Color(0xFFE53935);
-    } else {
-      numColor = theme.colorScheme.onSurface;
-    }
-
-    final dotColors = dayEvents.take(3).map((e) => e.color).toList();
 
   Widget _dayCell(
     BuildContext context,
@@ -381,10 +320,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     final dotColors = dayEvents.take(3).map((e) => e.color).toList();
-
-    // Bán kính bo góc: đủ tròn để bao trọn nội dung
-    // Khi có âm lịch (2 dòng) → bo nhiều hơn để thành hình oval
-    // Khi chỉ có 1 dòng → gần như hình tròn
     final radius = showLunar ? 10.0 : 20.0;
 
     return Container(
@@ -397,10 +332,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 : Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
         border: isToday && !isSelected
-            ? Border.all(
-                color: theme.colorScheme.primary,
-                width: 1.5,
-              )
+            ? Border.all(color: theme.colorScheme.primary, width: 1.5)
             : null,
       ),
       child: Column(
@@ -408,19 +340,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 3),
-          // Số dương lịch
           Text(
             '${day.day}',
             style: TextStyle(
               color: numColor,
               fontSize: 14,
-              fontWeight: isSelected || isToday
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+              fontWeight:
+                  isSelected || isToday ? FontWeight.bold : FontWeight.normal,
               height: 1.15,
             ),
           ),
-          // Số âm lịch (ẩn nếu setting tắt)
           if (showLunar && lunar != null)
             Text(
               lunar.day == 1
@@ -434,7 +363,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 height: 1.15,
               ),
             ),
-          // Dots sự kiện
           if (dotColors.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 2),
@@ -461,7 +389,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // ─── Event list ──────────────────────────────────────────────────────────
+  // ─── Event list header ───────────────────────────────────────────────────
 
   Widget _buildEventListHeader(BuildContext context, CalendarState state) {
     final theme = Theme.of(context);
@@ -489,7 +417,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
               child: Text(
                 '${state.selectedDateEvents.length}',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style:
+                    const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ),
           IconButton(
@@ -497,17 +426,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 size: 20, color: theme.colorScheme.primary),
             tooltip: 'Xem theo ngày',
             visualDensity: VisualDensity.compact,
-            onPressed: () => _openDayView(context, state.selectedDate),
+            onPressed: () =>
+                _openDayView(context, state.selectedDate),
           ),
         ],
       ),
     );
   }
 
+  // ─── Event list ──────────────────────────────────────────────────────────
+
   Widget _buildEventList(BuildContext context, CalendarState state) {
     if (state.selectedDateEvents.isEmpty) {
-      return SliverToBoxAdapter(
-          child: _buildEmptyState(context, state));
+      return SliverToBoxAdapter(child: _buildEmptyState(context, state));
     }
     return SliverList(
       delegate: SliverChildBuilderDelegate(
@@ -544,14 +475,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: Column(
         children: [
           Icon(Icons.event_note,
-              size: 56,
-              color: Theme.of(context).colorScheme.outline),
+              size: 56, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 8),
           Text(
             'Không có sự kiện',
             style: TextStyle(
-                color: Theme.of(context).colorScheme.outline,
-                fontSize: 15),
+                color: Theme.of(context).colorScheme.outline, fontSize: 15),
           ),
           const SizedBox(height: 4),
           TextButton.icon(
@@ -580,7 +509,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (!mounted) return;
       final bloc = context.read<CalendarBloc>();
       bloc.add(LoadCalendarEvents(bloc.state.focusedMonth));
-      // Sync focusedDay với selectedDate sau khi trở về
       setState(() => _focusedDay = bloc.state.selectedDate);
     });
   }
@@ -697,5 +625,4 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
-}
 }

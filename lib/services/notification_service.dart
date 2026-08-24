@@ -208,46 +208,32 @@ class NotificationService {
       return;
     }
 
-    // Nếu thời gian đã qua → không schedule
+    final isHoliday = event.type == EventType.holiday ||
+        event.type == EventType.lunarHoliday;
+    final body = _buildBody(event);
+
+    // Nếu thời gian nhắc đã qua → show ngay lập tức thay vì bỏ qua
     final now = DateTime.now();
     if (notifTime.isBefore(now)) {
       debugPrint(
-          '[Notif] Đã qua: ${event.title} (notif=$notifTime, now=$now)');
+          '[Notif] Đã qua: ${event.title} (notif=$notifTime) → show instant');
+      await _showScheduledNotification(
+        id: _notifId(event.id),
+        title: event.title,
+        body: body,
+        event: event,
+        isHoliday: isHoliday,
+      );
       return;
     }
 
     debugPrint('[Notif] Scheduling "${event.title}" lúc $notifTime');
 
-    final isHoliday = event.type == EventType.holiday ||
-        event.type == EventType.lunarHoliday;
-
     final notifId = _notifId(event.id);
     final tzTime = tz.TZDateTime.from(notifTime, tz.local);
     final scheduleMode = await _scheduleMode();
-    final body = _buildBody(event);
 
-    final android = AndroidNotificationDetails(
-      isHoliday ? 'holiday_channel_v2' : 'event_channel_v2',
-      isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
-      importance: isHoliday ? Importance.defaultImportance : Importance.high,
-      priority: isHoliday ? Priority.defaultPriority : Priority.high,
-      // Hiển thị đầy đủ trên màn hình khóa
-      visibility: NotificationVisibility.public,
-      // Full screen intent: hiện kể cả khi màn hình tắt
-      fullScreenIntent: !isHoliday,
-      playSound: true,
-      enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 400, 200, 400]),
-      color: event.color,
-      styleInformation: BigTextStyleInformation(
-        body,
-        contentTitle: event.title,
-        summaryText: 'Lịch Việt',
-      ),
-      category: AndroidNotificationCategory.reminder,
-      autoCancel: true,
-      icon: '@mipmap/ic_launcher',
-    );
+    final android = _buildAndroidDetails(event: event, body: body, isHoliday: isHoliday);
 
     const ios = DarwinNotificationDetails(
       presentAlert: true,
@@ -271,6 +257,66 @@ class NotificationService {
       debugPrint('[Notif] ✅ id=$notifId mode=$scheduleMode time=$tzTime');
     } catch (e) {
       debugPrint('[Notif] ❌ zonedSchedule error: $e');
+    }
+  }
+
+  /// Helper: Xây dựng AndroidNotificationDetails
+  AndroidNotificationDetails _buildAndroidDetails({
+    required CalendarEvent event,
+    required String body,
+    required bool isHoliday,
+  }) {
+    return AndroidNotificationDetails(
+      isHoliday ? 'holiday_channel_v2' : 'event_channel_v2',
+      isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
+      importance: isHoliday ? Importance.defaultImportance : Importance.high,
+      priority: isHoliday ? Priority.defaultPriority : Priority.high,
+      // Hiển thị đầy đủ trên màn hình khóa
+      visibility: NotificationVisibility.public,
+      // Full screen intent: hiện kể cả khi màn hình tắt
+      fullScreenIntent: !isHoliday,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 400, 200, 400]),
+      color: event.color,
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: event.title,
+        summaryText: 'Lịch Việt',
+      ),
+      category: AndroidNotificationCategory.reminder,
+      autoCancel: true,
+      icon: '@mipmap/ic_launcher',
+    );
+  }
+
+  /// Helper: Show thông báo ngay lập tức (dùng khi giờ nhắc đã qua)
+  Future<void> _showScheduledNotification({
+    required int id,
+    required String title,
+    required String body,
+    required CalendarEvent event,
+    required bool isHoliday,
+  }) async {
+    final android = _buildAndroidDetails(
+        event: event, body: body, isHoliday: isHoliday);
+    const ios = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    try {
+      await _plugin.show(
+        id,
+        title,
+        body,
+        NotificationDetails(android: android, iOS: ios),
+        payload: event.id,
+      );
+      debugPrint('[Notif] ✅ instant id=$id');
+    } catch (e) {
+      debugPrint('[Notif] ❌ instant show error: $e');
     }
   }
 
@@ -314,12 +360,16 @@ class NotificationService {
       final ap = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       final canExact = await ap?.canScheduleExactNotifications() ?? false;
-      debugPrint('[Notif] canScheduleExact=$canExact');
+      debugPrint('[Notif] canScheduleExact=$canExact (SDK=$_sdkVersion)');
       return canExact
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
     }
-    return AndroidScheduleMode.exactAllowWhileIdle;
+    // Android < 12 (SDK < 31): dùng alarmClock — sử dụng AlarmManager.setAlarmClock()
+    // Không bị Doze mode chặn, không cần runtime permission SCHEDULE_EXACT_ALARM
+    // Hiển thị icon đồng hồ trên status bar để user biết có alarm
+    debugPrint('[Notif] SDK=$_sdkVersion < 31, dùng alarmClock mode');
+    return AndroidScheduleMode.alarmClock;
   }
 
   // ─── Hủy ────────────────────────────────────────────────────────────────────

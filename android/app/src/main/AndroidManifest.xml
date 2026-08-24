@@ -24,12 +24,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
         android:minSdkVersion="33"/>
 
-    <!-- Android 12+ (API 31+): đặt alarm chính xác -->
+    <!-- Android 12+ (API 31+): đặt alarm chính xác, user có thể grant từ Settings -->
+    <!-- Chỉ dùng SCHEDULE_EXACT_ALARM, KHÔNG khai báo USE_EXACT_ALARM vì conflict -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:minSdkVersion="31"/>
-    <!-- Android 13+ (API 33+): thay thế SCHEDULE_EXACT_ALARM -->
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
-        android:minSdkVersion="33"/>
 
     <application
         android:label="Lịch Việt"

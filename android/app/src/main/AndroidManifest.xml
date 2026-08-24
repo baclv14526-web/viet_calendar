@@ -15,19 +15,19 @@
     <!-- Android 14+ (API 34+) cần permission riêng                           -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
-    <!-- ── FIX #3: Foreground service cho full-screen notification ─────────── -->
+    <!-- ── FIX #3: Foreground service cho notification ──────────────────────── -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
-        android:minSdkVersion="34"/>
 
     <!-- Android 13+ (API 33+): xin runtime permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
         android:minSdkVersion="33"/>
 
-    <!-- Android 12+ (API 31+): đặt alarm chính xác, user có thể grant từ Settings -->
-    <!-- Chỉ dùng SCHEDULE_EXACT_ALARM, KHÔNG khai báo USE_EXACT_ALARM vì conflict -->
+    <!-- Android 12+ (API 31+): đặt alarm chính xác -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:minSdkVersion="31"/>
+    <!-- Android 13+ (API 33+): thay thế SCHEDULE_EXACT_ALARM -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
+        android:minSdkVersion="33"/>
 
     <application
         android:label="Lịch Việt"
@@ -71,21 +71,6 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
-
-        <!--
-            FIX Android 14+: FOREGROUND_SERVICE_SPECIAL_USE yêu cầu khai báo
-            <service> với android:foregroundServiceType="specialUse"
-            Không có khai báo này → SecurityException khi dùng fullScreenIntent
-        -->
-        <service
-            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse"
-            android:stopWithTask="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="alarm"/>
-        </service>
 
         <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>

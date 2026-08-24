@@ -204,36 +204,42 @@ class NotificationService {
 
     final notifTime = _calcNotifTime(event);
     if (notifTime == null) {
-      debugPrint('[Notif] Không tính được giờ: ${event.title}');
-      return;
-    }
-
-    final isHoliday = event.type == EventType.holiday ||
-        event.type == EventType.lunarHoliday;
-    final body = _buildBody(event);
-
-    // Nếu thời gian nhắc đã qua → show ngay lập tức thay vì bỏ qua
-    final now = DateTime.now();
-    if (notifTime.isBefore(now)) {
-      debugPrint(
-          '[Notif] Đã qua: ${event.title} (notif=$notifTime) → show instant');
-      await _showScheduledNotification(
-        id: _notifId(event.id),
-        title: event.title,
-        body: body,
-        event: event,
-        isHoliday: isHoliday,
-      );
+      debugPrint('[Notif] Bỏ qua: ${event.title}');
       return;
     }
 
     debugPrint('[Notif] Scheduling "${event.title}" lúc $notifTime');
 
+    final isHoliday = event.type == EventType.holiday ||
+        event.type == EventType.lunarHoliday;
+
     final notifId = _notifId(event.id);
     final tzTime = tz.TZDateTime.from(notifTime, tz.local);
     final scheduleMode = await _scheduleMode();
+    final body = _buildBody(event);
 
-    final android = _buildAndroidDetails(event: event, body: body, isHoliday: isHoliday);
+    final android = AndroidNotificationDetails(
+      isHoliday ? 'holiday_channel_v2' : 'event_channel_v2',
+      isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
+      importance: isHoliday ? Importance.defaultImportance : Importance.high,
+      priority: isHoliday ? Priority.defaultPriority : Priority.high,
+      // Hiển thị đầy đủ trên màn hình khóa
+      visibility: NotificationVisibility.public,
+      // Full screen intent: hiện kể cả khi màn hình tắt
+      fullScreenIntent: !isHoliday,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 400, 200, 400]),
+      color: event.color,
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: event.title,
+        summaryText: 'Lịch Việt',
+      ),
+      category: AndroidNotificationCategory.reminder,
+      autoCancel: true,
+      icon: '@mipmap/ic_launcher',
+    );
 
     const ios = DarwinNotificationDetails(
       presentAlert: true,
@@ -257,66 +263,6 @@ class NotificationService {
       debugPrint('[Notif] ✅ id=$notifId mode=$scheduleMode time=$tzTime');
     } catch (e) {
       debugPrint('[Notif] ❌ zonedSchedule error: $e');
-    }
-  }
-
-  /// Helper: Xây dựng AndroidNotificationDetails
-  AndroidNotificationDetails _buildAndroidDetails({
-    required CalendarEvent event,
-    required String body,
-    required bool isHoliday,
-  }) {
-    return AndroidNotificationDetails(
-      isHoliday ? 'holiday_channel_v2' : 'event_channel_v2',
-      isHoliday ? 'Ngày lễ & Sự kiện đặc biệt' : 'Nhắc nhở sự kiện',
-      importance: isHoliday ? Importance.defaultImportance : Importance.high,
-      priority: isHoliday ? Priority.defaultPriority : Priority.high,
-      // Hiển thị đầy đủ trên màn hình khóa
-      visibility: NotificationVisibility.public,
-      // Full screen intent: hiện kể cả khi màn hình tắt
-      fullScreenIntent: !isHoliday,
-      playSound: true,
-      enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 400, 200, 400]),
-      color: event.color,
-      styleInformation: BigTextStyleInformation(
-        body,
-        contentTitle: event.title,
-        summaryText: 'Lịch Việt',
-      ),
-      category: AndroidNotificationCategory.reminder,
-      autoCancel: true,
-      icon: '@mipmap/ic_launcher',
-    );
-  }
-
-  /// Helper: Show thông báo ngay lập tức (dùng khi giờ nhắc đã qua)
-  Future<void> _showScheduledNotification({
-    required int id,
-    required String title,
-    required String body,
-    required CalendarEvent event,
-    required bool isHoliday,
-  }) async {
-    final android = _buildAndroidDetails(
-        event: event, body: body, isHoliday: isHoliday);
-    const ios = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-      interruptionLevel: InterruptionLevel.timeSensitive,
-    );
-    try {
-      await _plugin.show(
-        id,
-        title,
-        body,
-        NotificationDetails(android: android, iOS: ios),
-        payload: event.id,
-      );
-      debugPrint('[Notif] ✅ instant id=$id');
-    } catch (e) {
-      debugPrint('[Notif] ❌ instant show error: $e');
     }
   }
 
@@ -360,16 +306,12 @@ class NotificationService {
       final ap = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       final canExact = await ap?.canScheduleExactNotifications() ?? false;
-      debugPrint('[Notif] canScheduleExact=$canExact (SDK=$_sdkVersion)');
+      debugPrint('[Notif] canScheduleExact=$canExact');
       return canExact
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
     }
-    // Android < 12 (SDK < 31): dùng alarmClock — sử dụng AlarmManager.setAlarmClock()
-    // Không bị Doze mode chặn, không cần runtime permission SCHEDULE_EXACT_ALARM
-    // Hiển thị icon đồng hồ trên status bar để user biết có alarm
-    debugPrint('[Notif] SDK=$_sdkVersion < 31, dùng alarmClock mode');
-    return AndroidScheduleMode.alarmClock;
+    return AndroidScheduleMode.exactAllowWhileIdle;
   }
 
   // ─── Hủy ────────────────────────────────────────────────────────────────────
@@ -421,27 +363,78 @@ class NotificationService {
 
   int _notifId(String eventId) => eventId.hashCode.abs() % 2147483647;
 
+  /// Tính thời điểm gửi thông báo cho sự kiện.
+  /// Trả về null nếu không thể tính được.
+  /// KHÔNG bao giờ trả về thời gian trong quá khứ — tự điều chỉnh.
   DateTime? _calcNotifTime(CalendarEvent event) {
     final d = event.date;
     final minsBefore = event.notificationMinutesBefore ?? 30;
+    final now = DateTime.now();
+
+    DateTime notifTime;
 
     if (event.startTime != null) {
-      // Có giờ cụ thể → nhắc trước N phút
-      final start = DateTime(
-          d.year, d.month, d.day, event.startTime!.hour, event.startTime!.minute);
-      return start.subtract(Duration(minutes: minsBefore));
+      // Sự kiện có giờ cụ thể → nhắc trước N phút
+      final startDt = DateTime(
+        d.year, d.month, d.day,
+        event.startTime!.hour,
+        event.startTime!.minute,
+      );
+      notifTime = startDt.subtract(Duration(minutes: minsBefore));
+    } else if (event.isAllDay || event.startTime == null) {
+      // Cả ngày hoặc không có giờ:
+      // - Nếu nhắc 1 ngày trước (1440 phút): 8h sáng ngày hôm trước
+      // - Còn lại: 8h sáng ngày đó
+      if (minsBefore >= 1440) {
+        // Dùng subtract thay vì day-1 để tránh bug ngày 1 tháng
+        final prevDay = d.subtract(const Duration(days: 1));
+        notifTime = DateTime(prevDay.year, prevDay.month, prevDay.day, 8, 0);
+      } else {
+        notifTime = DateTime(d.year, d.month, d.day, 8, 0);
+      }
+    } else {
+      return null;
     }
 
-    if (event.isAllDay) {
-      // Cả ngày → nhắc 8h sáng ngày đó
-      // Nếu minsBefore >= 1440 → nhắc 8h sáng ngày hôm trước
-      return minsBefore >= 1440
-          ? DateTime(d.year, d.month, d.day - 1, 8, 0)
-          : DateTime(d.year, d.month, d.day, 8, 0);
+    // Nếu thời gian tính được đã qua:
+    // → Với sự kiện trong tương lai: thử nhắc ngay sau 1 phút
+    // → Với sự kiện trong quá khứ: bỏ qua
+    if (notifTime.isBefore(now)) {
+      final eventDay = DateTime(d.year, d.month, d.day);
+      final today = DateTime(now.year, now.month, now.day);
+
+      if (eventDay.isAfter(today)) {
+        // Sự kiện ngày mai trở đi nhưng giờ nhắc bị tính ra hôm nay đã qua
+        // → nhắc ngay sau 2 phút
+        notifTime = now.add(const Duration(minutes: 2));
+      } else if (eventDay.isAtSameMomentAs(today)) {
+        // Sự kiện hôm nay, giờ nhắc đã qua (vd: thêm lúc 9h cho sự kiện 8h)
+        // → nhắc ngay sau 1 phút nếu sự kiện chưa bắt đầu
+        if (event.startTime != null) {
+          final startDt = DateTime(
+            d.year, d.month, d.day,
+            event.startTime!.hour, event.startTime!.minute,
+          );
+          if (startDt.isAfter(now)) {
+            // Sự kiện chưa bắt đầu → nhắc ngay sau 1 phút
+            notifTime = now.add(const Duration(minutes: 1));
+          } else {
+            // Sự kiện đã bắt đầu rồi → không nhắc
+            debugPrint('[Notif] Sự kiện "${event.title}" đã bắt đầu, bỏ qua');
+            return null;
+          }
+        } else {
+          // Cả ngày hôm nay, giờ 8h đã qua → nhắc ngay sau 1 phút
+          notifTime = now.add(const Duration(minutes: 1));
+        }
+      } else {
+        // Sự kiện ngày hôm qua trở về trước → không nhắc
+        debugPrint('[Notif] Sự kiện "${event.title}" đã qua ngày, bỏ qua');
+        return null;
+      }
     }
 
-    // Không có giờ, không phải cả ngày → nhắc 8h sáng
-    return DateTime(d.year, d.month, d.day, 8, 0);
+    return notifTime;
   }
 
   String _buildBody(CalendarEvent event) {

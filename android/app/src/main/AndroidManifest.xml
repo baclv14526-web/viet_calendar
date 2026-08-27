@@ -17,6 +17,15 @@
 
     <!-- ── FIX #3: Foreground service cho notification ──────────────────────── -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        android:minSdkVersion="34"/>
+
+    <!-- ── FIX #4: Oppo/Realme ColorOS specific permissions ─────────────────── -->
+    <!-- Cho phép hiển thị trên các màn hình đặc biệt                          -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    
+    <!-- Cho phép app chạy trong nền (đặc biệt quan trọng cho ColorOS)          -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!-- Android 13+ (API 33+): xin runtime permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"
@@ -71,6 +80,17 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
+
+        <!-- Foreground service để giữ app chạy trong background (đặc biệt cho Oppo/Realme) -->
+        <service
+            android:name=".NotificationForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="notification_service"/>
+        </service>
 
         <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>

@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Map<String, bool> perms,
     List<PendingNotificationRequest> pending,
   ) {
-    final isOppoRealme = ns._isOppoOrRealme;
+    final isOppoRealme = ns.isOppoOrRealme;
     
     return Align(
       alignment: Alignment.bottomCenter,

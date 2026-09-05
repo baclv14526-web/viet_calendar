@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_settings.dart';
 import '../services/notification_service.dart';
@@ -202,156 +203,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '${min ~/ 60} giờ';
   }
 
-  Future<void> _showNotificationDiagnostic(BuildContext context) async {
+  void _showNotificationDiagnostic(BuildContext context) {
     final ns = NotificationServiceProvider.of(context).service;
     final messenger = ScaffoldMessenger.of(context);
-
-    final perms = await ns.checkPermissions();
-    final pending = await ns.getPendingNotifications();
-    if (!mounted) return;
-
-    // Dùng showModalBottomSheet với context từ State (không phải parameter context)
-    // vì State.context luôn valid khi mounted == true
     showModalBottomSheet(
-      context: this.context, // this.context từ State, không phải parameter
+      context: this.context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _notifDiagnosticSheet(ctx, ns, messenger, perms, pending),
-    );
-  }
-
-  Widget _notifDiagnosticSheet(
-    BuildContext ctx,
-    NotificationService ns,
-    ScaffoldMessengerState messenger,
-    Map<String, bool> perms,
-    List<PendingNotificationRequest> pending,
-  ) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(ctx).colorScheme.surface,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('🔔 Chẩn đoán Thông báo',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  _permRow('Quyền hiển thị thông báo',
-                      perms['notification'] ?? false),
-                  _permRow('Đặt lịch chính xác (Alarm)',
-                      perms['exactAlarm'] ?? false),
-                  _permRow(
-                      'Bỏ qua tối ưu pin (Doze)', perms['battery'] ?? false),
-                  const Divider(height: 20),
-                  Row(children: [
-                    const Icon(Icons.pending_actions,
-                        size: 18, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    Text('Thông báo đang chờ: ${pending.length}'),
-                  ]),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.security),
-                      label: const Text('Xin lại tất cả quyền'),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await ns.requestAllPermissions();
-                        messenger.showSnackBar(const SnackBar(
-                            content: Text('Đã yêu cầu quyền')));
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.send),
-                      label: const Text('Test tức thì'),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await ns.showInstantNotification(
-                          title: '🧧 Lịch Việt – Test tức thì',
-                          body: 'Thông báo tức thì hoạt động! ✅',
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.alarm),
-                      label:
-                          const Text('Test lên lịch (sau 5 giây) ← quan trọng'),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await ns.scheduleTestIn5Seconds();
-                        messenger.showSnackBar(const SnackBar(
-                          content: Text(
-                            '⏱ Chờ 5 giây — nếu không thấy thông báo: '
-                            'quyền Báo thức hoặc Pin chưa được cấp!',
-                          ),
-                          duration: Duration(seconds: 9),
-                        ));
-                      },
-                    ),
-                  ),
-                  if (perms['battery'] == false) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: Colors.orange.withOpacity(0.3)),
-                      ),
-                      child: const Text(
-                        '⚠️ Vào Cài đặt → Ứng dụng → Lịch Việt → Pin → '
-                        'Chọn "Không hạn chế" để thông báo hoạt động khi màn hình tắt.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                  if (perms['exactAlarm'] == false) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: Colors.red.withOpacity(0.3)),
-                      ),
-                      child: const Text(
-                        '⚠️ Vào Cài đặt → Ứng dụng → Quyền đặc biệt → '
-                        'Báo thức & nhắc nhở → Bật Lịch Việt.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      builder: (_) => _NotifDiagnosticSheet(ns: ns, messenger: messenger),
     );
   }
 
@@ -412,4 +272,306 @@ class _Chip extends StatelessWidget {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
       );
+}
+
+// ─── Notification Diagnostic Sheet ───────────────────────────────────────────
+// StatefulWidget để có thể reload permission status nhiều lần,
+// mở lại bình thường sau khi user quay về từ Settings hệ thống.
+
+class _NotifDiagnosticSheet extends StatefulWidget {
+  final NotificationService ns;
+  final ScaffoldMessengerState messenger;
+
+  const _NotifDiagnosticSheet({
+    required this.ns,
+    required this.messenger,
+  });
+
+  @override
+  State<_NotifDiagnosticSheet> createState() => _NotifDiagnosticSheetState();
+}
+
+class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
+    with WidgetsBindingObserver {
+  Map<String, bool> _perms = {
+    'notification': true,
+    'exactAlarm': true,
+    'battery': true,
+  };
+  List<PendingNotificationRequest> _pending = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lắng nghe khi user quay về từ Settings hệ thống → tự reload
+    WidgetsBinding.instance.addObserver(this);
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Tự động reload khi app resumed (user quay về từ Settings hệ thống)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reload();
+    }
+  }
+
+  Future<void> _reload() async {
+    setState(() => _loading = true);
+    final perms = await widget.ns.checkPermissions();
+    final pending = await widget.ns.getPendingNotifications();
+    if (mounted) {
+      setState(() {
+        _perms = perms;
+        _pending = pending;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final allOk = _perms.values.every((v) => v);
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                const Text('🔔 Chẩn đoán Thông báo',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (_loading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    tooltip: 'Kiểm tra lại',
+                    onPressed: _reload,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Status tổng quan
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: allOk
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: allOk
+                        ? Colors.green.withOpacity(0.3)
+                        : Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    allOk ? Icons.check_circle : Icons.warning_amber_rounded,
+                    color: allOk ? Colors.green : Colors.orange,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    allOk
+                        ? 'Tất cả quyền đã được cấp'
+                        : 'Một số quyền chưa được cấp',
+                    style: TextStyle(
+                      color: allOk ? Colors.green[700] : Colors.orange[800],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Chi tiết từng quyền với nút mở Settings riêng lẻ
+            _permissionTile(
+              label: 'Hiển thị thông báo',
+              granted: _perms['notification'] ?? false,
+              onGrant: () async {
+                await widget.ns.requestAllPermissions();
+                _reload();
+              },
+              onOpenSettings: () async {
+                await openAppSettings();
+                // reload tự động qua didChangeAppLifecycleState
+              },
+            ),
+            _permissionTile(
+              label: 'Đặt báo thức chính xác',
+              granted: _perms['exactAlarm'] ?? false,
+              hint: 'Settings → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở',
+              onGrant: () async {
+                await widget.ns.requestAllPermissions();
+                _reload();
+              },
+              onOpenSettings: () async {
+                await openAppSettings();
+              },
+            ),
+            _permissionTile(
+              label: 'Bỏ qua tối ưu pin (Doze)',
+              granted: _perms['battery'] ?? false,
+              hint: 'Settings → Pin → Tối ưu hóa pin → Lịch Việt → Không tối ưu',
+              onGrant: () async {
+                await widget.ns.requestAllPermissions();
+                _reload();
+              },
+              onOpenSettings: () async {
+                await openAppSettings();
+              },
+            ),
+
+            const Divider(height: 20),
+
+            // Số thông báo đang chờ
+            Row(children: [
+              const Icon(Icons.pending_actions, size: 16, color: Colors.blue),
+              const SizedBox(width: 6),
+              Text('Thông báo đang chờ: ${_pending.length}',
+                  style: const TextStyle(fontSize: 13)),
+              const Spacer(),
+              if (_pending.isNotEmpty)
+                TextButton(
+                  onPressed: () async {
+                    await widget.ns.cancelAllNotifications();
+                    _reload();
+                  },
+                  child: const Text('Xóa hết',
+                      style: TextStyle(fontSize: 12, color: Colors.red)),
+                ),
+            ]),
+
+            const SizedBox(height: 12),
+
+            // Test buttons — KHÔNG đóng sheet, hiện kết quả inline
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.send, size: 16),
+                    label: const Text('Test ngay', style: TextStyle(fontSize: 12)),
+                    onPressed: () async {
+                      await widget.ns.showInstantNotification(
+                        title: '🧧 Lịch Việt – Test tức thì',
+                        body: 'Thông báo tức thì hoạt động! ✅',
+                      );
+                      if (mounted) {
+                        widget.messenger.showSnackBar(const SnackBar(
+                          content: Text('Đã gửi thông báo tức thì'),
+                        ));
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.alarm, size: 16),
+                    label: const Text('Test 5 giây', style: TextStyle(fontSize: 12)),
+                    onPressed: () async {
+                      await widget.ns.scheduleTestIn5Seconds();
+                      await _reload();
+                      if (mounted) {
+                        widget.messenger.showSnackBar(const SnackBar(
+                          content: Text(
+                              '⏱ Chờ 5 giây... nếu không thấy → thiếu quyền pin/báo thức!'),
+                          duration: Duration(seconds: 7),
+                        ));
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _permissionTile({
+    required String label,
+    required bool granted,
+    String? hint,
+    required VoidCallback onGrant,
+    required VoidCallback onOpenSettings,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            granted ? Icons.check_circle : Icons.cancel,
+            size: 18,
+            color: granted ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 13)),
+                if (!granted && hint != null)
+                  Text(hint,
+                      style:
+                          TextStyle(fontSize: 10, color: Colors.grey[500])),
+              ],
+            ),
+          ),
+          if (!granted)
+            TextButton(
+              onPressed: onOpenSettings,
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+              ),
+              child: const Text('Mở cài đặt',
+                  style:
+                      TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('OK',
+                  style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
+    );
+  }
 }

@@ -228,8 +228,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Map<String, bool> perms,
     List<PendingNotificationRequest> pending,
   ) {
-    final isOppoRealme = ns.isOppoOrRealme;
-    
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
@@ -243,156 +241,112 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
             child: SafeArea(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('🔔 Chẩn đoán Thông báo',
-                        style:
-                            TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    _permRow('Quyền hiển thị thông báo',
-                        perms['notification'] ?? false),
-                    _permRow('Đặt lịch chính xác (Alarm)',
-                        perms['exactAlarm'] ?? false),
-                    _permRow(
-                        'Bỏ qua tối ưu pin (Doze)', perms['battery'] ?? false),
-                    if (isOppoRealme)
-                      _permRow('Tự khởi động (Oppo/Realme)', 
-                          perms['autoStart'] ?? false),
-                    const Divider(height: 20),
-                    Row(children: [
-                      const Icon(Icons.pending_actions,
-                          size: 18, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Text('Thông báo đang chờ: ${pending.length}'),
-                    ]),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.security),
-                        label: const Text('Xin lại tất cả quyền'),
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          await ns.requestAllPermissions();
-                          messenger.showSnackBar(const SnackBar(
-                              content: Text('Đã yêu cầu quyền')));
-                        },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('🔔 Chẩn đoán Thông báo',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _permRow('Quyền hiển thị thông báo',
+                      perms['notification'] ?? false),
+                  _permRow('Đặt lịch chính xác (Alarm)',
+                      perms['exactAlarm'] ?? false),
+                  _permRow(
+                      'Bỏ qua tối ưu pin (Doze)', perms['battery'] ?? false),
+                  const Divider(height: 20),
+                  Row(children: [
+                    const Icon(Icons.pending_actions,
+                        size: 18, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Text('Thông báo đang chờ: ${pending.length}'),
+                  ]),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.security),
+                      label: const Text('Xin lại tất cả quyền'),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ns.requestAllPermissions();
+                        messenger.showSnackBar(const SnackBar(
+                            content: Text('Đã yêu cầu quyền')));
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.send),
+                      label: const Text('Test tức thì'),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ns.showInstantNotification(
+                          title: '🧧 Lịch Việt – Test tức thì',
+                          body: 'Thông báo tức thì hoạt động! ✅',
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.alarm),
+                      label:
+                          const Text('Test lên lịch (sau 5 giây) ← quan trọng'),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ns.scheduleTestIn5Seconds();
+                        messenger.showSnackBar(const SnackBar(
+                          content: Text(
+                            '⏱ Chờ 5 giây — nếu không thấy thông báo: '
+                            'quyền Báo thức hoặc Pin chưa được cấp!',
+                          ),
+                          duration: Duration(seconds: 9),
+                        ));
+                      },
+                    ),
+                  ),
+                  if (perms['battery'] == false) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: const Text(
+                        '⚠️ Vào Cài đặt → Ứng dụng → Lịch Việt → Pin → '
+                        'Chọn "Không hạn chế" để thông báo hoạt động khi màn hình tắt.',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.send),
-                        label: const Text('Test tức thì'),
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          await ns.showInstantNotification(
-                            title: '🧧 Lịch Việt – Test tức thì',
-                            body: 'Thông báo tức thì hoạt động! ✅',
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.alarm),
-                        label:
-                            const Text('Test lên lịch (sau 5 giây) ← quan trọng'),
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          await ns.scheduleTestIn5Seconds();
-                          messenger.showSnackBar(const SnackBar(
-                            content: Text(
-                              '⏱ Chờ 5 giây — nếu không thấy thông báo: '
-                              'quyền Báo thức hoặc Pin chưa được cấp!',
-                            ),
-                            duration: Duration(seconds: 9),
-                          ));
-                        },
-                      ),
-                    ),
-                    if (isOppoRealme) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: Colors.green.withOpacity(0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.phone_android, 
-                                    size: 16, color: Colors.green[700]),
-                                const SizedBox(width: 8),
-                                Text('Phát hiện Oppo/Realme (ColorOS)',
-                                    style: TextStyle(
-                                        fontSize: 13, 
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green[700])),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              '📱 ColorOS yêu cầu cấu hình đặc biệt để thông báo hoạt động:',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              ns.getOppoRealmeGuide(),
-                              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (perms['battery'] == false) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: Colors.orange.withOpacity(0.3)),
-                        ),
-                        child: const Text(
-                          '⚠️ Vào Cài đặt → Ứng dụng → Lịch Việt → Pin → '
-                          'Chọn "Không hạn chế" để thông báo hoạt động khi màn hình tắt.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                    if (perms['exactAlarm'] == false) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Colors.red.withOpacity(0.3)),
-                        ),
-                        child: const Text(
-                          '⚠️ Vào Cài đặt → Ứng dụng → Quyền đặc biệt → '
-                          'Báo thức & nhắc nhở → Bật Lịch Việt.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
                   ],
-                ),
+                  if (perms['exactAlarm'] == false) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: const Text(
+                        '⚠️ Vào Cài đặt → Ứng dụng → Quyền đặc biệt → '
+                        'Báo thức & nhắc nhở → Bật Lịch Việt.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
           ),

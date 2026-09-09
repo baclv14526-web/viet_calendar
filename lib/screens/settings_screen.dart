@@ -215,22 +215,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _permRow(String label, bool ok) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(children: [
-        Icon(ok ? Icons.check_circle : Icons.cancel,
-            size: 18, color: ok ? Colors.green : Colors.red),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-        Text(ok ? 'OK' : 'Thiếu',
-            style: TextStyle(
-                color: ok ? Colors.green : Colors.red,
-                fontSize: 12,
-                fontWeight: FontWeight.bold)),
-      ]),
-    );
-  }
 
   void _showReminderPicker() {
     showModalBottomSheet(

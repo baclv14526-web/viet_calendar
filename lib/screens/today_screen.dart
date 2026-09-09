@@ -210,7 +210,9 @@ class _TodayScreenState extends State<TodayScreen> {
           const Divider(height: 1, thickness: 0.5),
 
           // ── Can Chi + Âm lịch ─────────────────────────────────────
-          _buildBottomInfo(context, theme, lunar),
+          Expanded(
+            child: _buildBottomInfo(context, theme, lunar),
+          ),
         ],
       ),
     );
@@ -384,6 +386,8 @@ class _TodayScreenState extends State<TodayScreen> {
 
     return Container(
       color: const Color(0xFFFFF3E0),
+      width: double.infinity,
+      height: double.infinity,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         child: Row(

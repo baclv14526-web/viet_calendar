@@ -32,7 +32,7 @@ jobs:
   quality:
     name: 🔍 Code Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: 📥 Checkout code
@@ -44,6 +44,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          cache-key: flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
 
       - name: 📦 Get dependencies
         run: flutter pub get
@@ -61,8 +62,7 @@ jobs:
   test:
     name: 🧪 Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: quality
+    timeout-minutes: 10
 
     steps:
       - name: 📥 Checkout code
@@ -74,6 +74,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          cache-key: flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
 
       - name: 📦 Get dependencies
         run: flutter pub get
@@ -95,7 +96,7 @@ jobs:
   build_android_debug:
     name: 🤖 Android Debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     needs: test
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
@@ -115,9 +116,21 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          cache-key: flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
 
       - name: 📦 Get dependencies
         run: flutter pub get
+
+      - name: 💾 Setup Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: 🔨 Build APK (Debug)
         run: flutter build apk --debug
@@ -137,7 +150,7 @@ jobs:
   build_android_release:
     name: 🤖 Android Release
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     needs: test
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
@@ -164,9 +177,21 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          cache-key: flutter-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
 
       - name: 📦 Get dependencies
         run: flutter pub get
+
+      - name: 💾 Setup Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       # Dùng bash if để kiểm tra — KHÔNG dùng secrets trong step if:
       - name: 🔑 Setup Keystore (nếu có)

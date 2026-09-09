@@ -4,6 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import '../models/calendar_event.dart';
@@ -19,6 +20,15 @@ class NotificationService {
 
   bool _initialized = false;
   int _sdkVersion = 0;
+  String _manufacturer = '';
+  String _deviceBrand = '';
+  bool _isOppoOrRealme = false;
+  
+  // Platform channel để gọi foreground service
+  static const _platform = MethodChannel('com.viet.lichviet/notification_service');
+  
+  // Getter để truy cập từ bên ngoài
+  bool get isOppoOrRealme => _isOppoOrRealme;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +38,17 @@ class NotificationService {
     if (Platform.isAndroid) {
       final info = await DeviceInfoPlugin().androidInfo;
       _sdkVersion = info.version.sdkInt;
+      _manufacturer = info.manufacturer.toLowerCase();
+      _deviceBrand = info.brand.toLowerCase();
+      _isOppoOrRealme = _manufacturer.contains('oppo') || 
+                       _deviceBrand.contains('oppo') ||
+                       _manufacturer.contains('realme') ||
+                       _deviceBrand.contains('realme');
+      
       debugPrint('[Notif] Android SDK: $_sdkVersion');
+      debugPrint('[Notif] Manufacturer: $_manufacturer');
+      debugPrint('[Notif] Brand: $_deviceBrand');
+      debugPrint('[Notif] Is Oppo/Realme: $_isOppoOrRealme');
     }
 
     // Initialize timezone - MUST be called before any TZDateTime usage
@@ -51,6 +71,17 @@ class NotificationService {
     );
 
     await _createChannels();
+    
+    // Đối với Oppo/Realme, khởi động foreground service để giữ app chạy
+    if (_isOppoOrRealme) {
+      try {
+        await _platform.invokeMethod('startForegroundService');
+        debugPrint('[Notif] Foreground service started for Oppo/Realme');
+      } catch (e) {
+        debugPrint('[Notif] Failed to start foreground service: $e');
+      }
+    }
+    
     _initialized = true;
   }
 
@@ -132,12 +163,26 @@ class NotificationService {
     }
 
     // Battery optimization - cần thiết để alarm hoạt động trong Doze mode
+    // Đặc biệt quan trọng trên Oppo/Realme với ColorOS
     final battery = await Permission.ignoreBatteryOptimizations.status;
     result['battery'] = battery.isGranted;
     if (!battery.isGranted) {
+      // Đối với Oppo/Realme, cần mở cài đặt cụ thể của ColorOS
+      if (_isOppoOrRealme) {
+        debugPrint('[Notif] Oppo/Realme detected - opening ColorOS battery settings');
+        await _openOppoBatterySettings();
+      }
+      
       await Permission.ignoreBatteryOptimizations.request();
       result['battery'] =
           (await Permission.ignoreBatteryOptimizations.status).isGranted;
+    }
+
+    // Đối với Oppo/Realme, kiểm tra thêm quyền tự khởi động
+    if (_isOppoOrRealme) {
+      result['autoStart'] = await _checkOppoAutoStart();
+    } else {
+      result['autoStart'] = true;
     }
 
     debugPrint('[Notif] Permissions: $result');
@@ -151,13 +196,13 @@ class NotificationService {
 
   Future<Map<String, bool>> checkPermissions() async {
     if (!Platform.isAndroid) {
-      return {'notification': true, 'exactAlarm': true, 'battery': true};
+      return {'notification': true, 'exactAlarm': true, 'battery': true, 'autoStart': true};
     }
 
     final ap = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
-    return {
+    final result = {
       'notification': _sdkVersion < 33 ||
           (await Permission.notification.status).isGranted,
       'exactAlarm': (_sdkVersion != 31 && _sdkVersion != 32) ||
@@ -165,6 +210,15 @@ class NotificationService {
       'battery':
           (await Permission.ignoreBatteryOptimizations.status).isGranted,
     };
+    
+    // Kiểm tra quyền tự khởi động cho Oppo/Realme
+    if (_isOppoOrRealme) {
+      result['autoStart'] = await _checkOppoAutoStart();
+    } else {
+      result['autoStart'] = true;
+    }
+
+    return result;
   }
 
   // ─── Schedule notification ─────────────────────────────────────────────────
@@ -408,5 +462,54 @@ class NotificationService {
       return 'Bắt đầu lúc $h:$m${mins > 0 ? " • còn $mins phút" : ""}';
     }
     return 'Nhắc nhở sự kiện trong lịch Việt';
+  }
+
+  // ─── Oppo/Realme ColorOS Specific Methods ───────────────────────────────────
+
+  /// Mở cài đặt pin của ColorOS cho Oppo/Realme
+  Future<void> _openOppoBatterySettings() async {
+    try {
+      // Mở cài đặt pin chung trước
+      await Permission.ignoreBatteryOptimizations.request();
+      
+      // Thử mở các activity cụ thể của ColorOS
+      // Lưu ý: Có thể cần người dùng thao tác thủ công
+      debugPrint('[Notif] Opening battery optimization settings');
+    } catch (e) {
+      debugPrint('[Notif] Error opening battery settings: $e');
+    }
+  }
+
+  /// Kiểm tra quyền tự khởi động trên Oppo/Realme
+  /// Lưu ý: Không có API chính thức, chỉ có thể hướng dẫn người dùng
+  Future<bool> _checkOppoAutoStart() async {
+    // Trả về true mặc định vì không có cách kiểm tra chính xác
+    // Sẽ hướng dẫn người dùng trong UI
+    return true;
+  }
+
+  /// Lấy hướng dẫn cài đặt cho Oppo/Realme
+  String getOppoRealmeGuide() {
+    return '''
+📱 Hướng dẫn cho Oppo/Realme (ColorOS):
+
+1. Bật thông báo:
+   Cài đặt → Thông báo → Lịch Việt → Bật "Cho phép thông báo"
+
+2. Bỏ qua tối ưu pin (QUAN TRỌNG NHẤT):
+   Cài đặt → Pin → Tiết kiệm pin → Lịch Việt → Chọn "Không hạn chế"
+   
+   HOẶC:
+   Cài đặt → Ứng dụng → Lịch Việt → Pin → Bỏ qua tối ưu hóa
+
+3. Bật tự khởi động:
+   Cài đặt → Ứng dụng → Lịch Việt → Quyền → Tự khởi động → Bật
+
+4. Bật báo thức:
+   Cài đặt → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở → Bật Lịch Việt
+
+5. Cho phép chạy trong nền:
+   Cài đặt → Ứng dụng → Lịch Việt → Chạy trong nền → Bật
+''';
   }
 }

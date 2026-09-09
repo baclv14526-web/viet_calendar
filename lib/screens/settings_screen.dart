@@ -281,6 +281,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
     'notification': true,
     'exactAlarm': true,
     'battery': true,
+    'autoStart': true,
   };
   List<PendingNotificationRequest> _pending = [];
   bool _loading = true;
@@ -323,6 +324,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isOppoRealme = widget.ns.isOppoOrRealme;
     final allOk = _perms.values.every((v) => v);
 
     return Container(
@@ -434,6 +436,22 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                 await openAppSettings();
               },
             ),
+            
+            // Oppo/Realme specific permissions
+            if (isOppoRealme) ...[
+              _permissionTile(
+                label: 'Tự khởi động (ColorOS)',
+                granted: _perms['autoStart'] ?? false,
+                hint: 'Settings → Ứng dụng → Quyền → Tự khởi động',
+                onGrant: () async {
+                  await widget.ns.requestAllPermissions();
+                  _reload();
+                },
+                onOpenSettings: () async {
+                  await openAppSettings();
+                },
+              ),
+            ],
 
             const Divider(height: 20),
 
@@ -498,6 +516,46 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
               ],
             ),
             const SizedBox(height: 16),
+            
+            // Oppo/Realme specific guide
+            if (isOppoRealme) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.phone_android, 
+                            size: 16, color: Colors.green[700]),
+                        const SizedBox(width: 8),
+                        Text('Phát hiện Oppo/Realme (ColorOS)',
+                            style: TextStyle(
+                                fontSize: 13, 
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[700])),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '📱 ColorOS yêu cầu cấu hình đặc biệt:',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.ns.getOppoRealmeGuide(),
+                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ],
         ),
       ),

@@ -442,7 +442,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
               _permissionTile(
                 label: 'Tự khởi động (ColorOS)',
                 granted: _perms['autoStart'] ?? false,
-                hint: 'Settings → Ứng dụng → Quyền → Tự khởi động',
+                hint: 'Settings → Ứng dụng → Quyền → Tự khởi động (Khuyên dùng)',
                 onGrant: () async {
                   await widget.ns.requestAllPermissions();
                   _reload();
@@ -543,7 +543,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '📱 ColorOS yêu cầu cấu hình đặc biệt:',
+                      '📱 ColorOS yêu cầu cấu hình đặc biệt (Giống Google Calendar):',
                       style: TextStyle(fontSize: 12),
                     ),
                     const SizedBox(height: 4),

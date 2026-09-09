@@ -72,17 +72,12 @@ class NotificationService {
 
     await _createChannels();
     
-    // Đối với Oppo/Realme, khởi động foreground service để giữ app chạy
-    if (_isOppoOrRealme) {
-      try {
-        await _platform.invokeMethod('startForegroundService');
-        debugPrint('[Notif] Foreground service started for Oppo/Realme');
-      } catch (e) {
-        debugPrint('[Notif] Failed to start foreground service: $e');
-      }
-    }
+    // KHÔNG dùng foreground service - dùng AlarmManager như Google Calendar
+    // Foreground service chỉ cần cho các trường hợp đặc biệt
+    // Đối với thông báo lịch, AlarmClock mode đã đủ mạnh
     
     _initialized = true;
+    debugPrint('[Notif] Using AlarmManager (like Google Calendar) - no foreground service needed');
   }
 
   Future<void> _createChannels() async {
@@ -310,24 +305,35 @@ class NotificationService {
   Future<AndroidScheduleMode> _scheduleMode() async {
     if (Platform.isIOS) return AndroidScheduleMode.exactAllowWhileIdle;
 
-    // Android 13+ (SDK 33+): USE_EXACT_ALARM auto-granted
-    // alarmClock = setAlarmClock() - exempt from Doze, most reliable
+    // Giống Google Calendar: dùng AlarmManager thay vì foreground service
+    // alarmClock mode = setAlarmClock() - EXEMPT từ Doze mode
+    // Không cần app chạy - hệ thống Android tự hiển thị notification
+    // Tương tự như Google Calendar, không cần foreground service
+    
     if (_sdkVersion >= 33) {
+      // Android 13+: USE_EXACT_ALARM auto-granted, alarmClock hoạt động tốt nhất
+      debugPrint('[Notif] Using alarmClock mode (Android 13+, like Google Calendar)');
       return AndroidScheduleMode.alarmClock;
     }
 
-    // Android 9-11 (SDK 28-30): không cần permission, exact works
     if (_sdkVersion < 31) {
+      // Android 9-11 (SDK 28-30): alarmClock hoạt động tốt, không cần permission
+      debugPrint('[Notif] Using alarmClock mode (Android 9-11, like Google Calendar)');
       return AndroidScheduleMode.alarmClock;
     }
 
-    // Android 12 (SDK 31-32): cần SCHEDULE_EXACT_ALARM
+    // Android 12 (SDK 31-32): cần SCHEDULE_EXACT_ALARM permission
     final ap = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     final canExact = await ap?.canScheduleExactNotifications() ?? false;
-    return canExact
-        ? AndroidScheduleMode.alarmClock
-        : AndroidScheduleMode.inexactAllowWhileIdle;
+    
+    if (canExact) {
+      debugPrint('[Notif] Using alarmClock mode (Android 12 with exact alarm, like Google Calendar)');
+      return AndroidScheduleMode.alarmClock;
+    } else {
+      debugPrint('[Notif] WARNING: Using inexact mode - notifications may be delayed');
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
   }
 
   // ─── Cancel ────────────────────────────────────────────────────────────────
@@ -492,6 +498,7 @@ class NotificationService {
   String getOppoRealmeGuide() {
     return '''
 📱 Hướng dẫn cho Oppo/Realme (ColorOS):
+🔥 Giống Google Calendar - KHÔNG cần chạy nền!
 
 1. Bật thông báo:
    Cài đặt → Thông báo → Lịch Việt → Bật "Cho phép thông báo"
@@ -502,14 +509,17 @@ class NotificationService {
    HOẶC:
    Cài đặt → Ứng dụng → Lịch Việt → Pin → Bỏ qua tối ưu hóa
 
-3. Bật tự khởi động:
+3. Bật báo thức (QUAN TRỌNG):
+   Cài đặt → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở → Bật Lịch Việt
+   (Đây là cách Google Calendar hoạt động - không cần app chạy)
+
+4. Tự khởi động (ColorOS đặc biệt):
    Cài đặt → Ứng dụng → Lịch Việt → Quyền → Tự khởi động → Bật
 
-4. Bật báo thức:
-   Cài đặt → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở → Bật Lịch Việt
-
-5. Cho phép chạy trong nền:
-   Cài đặt → Ứng dụng → Lịch Việt → Chạy trong nền → Bật
+💡 TIPS:
+- KHÔNG cần bật "Chạy trong nền" - tốn pin
+- Hệ thống tự thông báo như Google Calendar
+- Đảm bảo quyền Báo thức là QUAN TRỌNG NHẤT
 ''';
   }
 }

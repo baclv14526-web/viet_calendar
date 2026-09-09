@@ -482,16 +482,14 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
   }
 
   Future<void> _deleteOne(CalendarEvent event) async {
+    final messenger = ScaffoldMessenger.of(context);
     context.read<CalendarBloc>().add(DeleteEvent(event.id));
     await _loadEvents();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Đã xóa "${event.title}"'),
-          action: SnackBarAction(
-            label: 'OK',
-            onPressed: () {},
-          ),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
         ),
       );
     }
@@ -500,6 +498,8 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
   Future<void> _deleteSelected() async {
     final ids = List<String>.from(_selectedIds);
     final count = ids.length;
+    final messenger = ScaffoldMessenger.of(context);
+    final bloc = context.read<CalendarBloc>();
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -511,8 +511,7 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Hủy')),
           FilledButton(
-            style:
-                FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Xóa $count'),
           ),
@@ -523,7 +522,7 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
     if (confirmed != true || !mounted) return;
 
     for (final id in ids) {
-      context.read<CalendarBloc>().add(DeleteEvent(id));
+      bloc.add(DeleteEvent(id));
     }
 
     setState(() {
@@ -534,7 +533,7 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
     await _loadEvents();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Đã xóa $count sự kiện')),
       );
     }
@@ -542,6 +541,9 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
 
   Future<void> _deletePastEvents() async {
     final pastCount = _past.length;
+    final messenger = ScaffoldMessenger.of(context);
+    final bloc = context.read<CalendarBloc>();
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -557,8 +559,7 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Hủy')),
           FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.orange[700]),
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange[700]),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('Xóa $pastCount'),
           ),
@@ -569,16 +570,14 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
     if (confirmed != true || !mounted) return;
 
     for (final e in _past) {
-      context.read<CalendarBloc>().add(DeleteEvent(e.id));
+      bloc.add(DeleteEvent(e.id));
     }
 
     await _loadEvents();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text('Đã xóa $pastCount sự kiện đã qua')),
+      messenger.showSnackBar(
+        SnackBar(content: Text('Đã xóa $pastCount sự kiện đã qua')),
       );
     }
   }

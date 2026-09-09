@@ -608,13 +608,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
         actions: [
           FilledButton(
             onPressed: () async {
+              // Lưu service trước await để tránh context-after-await
+              final svc = NotificationServiceProvider.of(context).service;
               Navigator.pop(ctx);
-              await NotificationServiceProvider.of(context)
-                  .service
-                  .showInstantNotification(
-                    title: '🧧 Lịch Việt - Test',
-                    body: 'Thông báo hoạt động bình thường! 🎉',
-                  );
+              await svc.showInstantNotification(
+                title: '🧧 Lịch Việt - Test',
+                body: 'Thông báo hoạt động bình thường! 🎉',
+              );
             },
             child: const Text('Gửi test'),
           ),

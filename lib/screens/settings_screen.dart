@@ -281,7 +281,6 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
     'notification': true,
     'exactAlarm': true,
     'battery': true,
-    'autoStart': true,
   };
   List<PendingNotificationRequest> _pending = [];
   bool _loading = true;
@@ -436,22 +435,6 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                 await openAppSettings();
               },
             ),
-            
-            // Oppo/Realme specific permissions
-            if (isOppoRealme) ...[
-              _permissionTile(
-                label: 'Tự khởi động (ColorOS)',
-                granted: _perms['autoStart'] ?? false,
-                hint: 'Settings → Ứng dụng → Quyền → Tự khởi động (Khuyên dùng)',
-                onGrant: () async {
-                  await widget.ns.requestAllPermissions();
-                  _reload();
-                },
-                onOpenSettings: () async {
-                  await openAppSettings();
-                },
-              ),
-            ],
 
             const Divider(height: 20),
 

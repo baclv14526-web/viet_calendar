@@ -4,7 +4,6 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import '../models/calendar_event.dart';
@@ -23,9 +22,6 @@ class NotificationService {
   String _manufacturer = '';
   String _deviceBrand = '';
   bool _isOppoOrRealme = false;
-  
-  // Platform channel để gọi foreground service
-  static const _platform = MethodChannel('com.viet.lichviet/notification_service');
   
   // Getter để truy cập từ bên ngoài
   bool get isOppoOrRealme => _isOppoOrRealme;
@@ -158,26 +154,12 @@ class NotificationService {
     }
 
     // Battery optimization - cần thiết để alarm hoạt động trong Doze mode
-    // Đặc biệt quan trọng trên Oppo/Realme với ColorOS
     final battery = await Permission.ignoreBatteryOptimizations.status;
     result['battery'] = battery.isGranted;
     if (!battery.isGranted) {
-      // Đối với Oppo/Realme, cần mở cài đặt cụ thể của ColorOS
-      if (_isOppoOrRealme) {
-        debugPrint('[Notif] Oppo/Realme detected - opening ColorOS battery settings');
-        await _openOppoBatterySettings();
-      }
-      
       await Permission.ignoreBatteryOptimizations.request();
       result['battery'] =
           (await Permission.ignoreBatteryOptimizations.status).isGranted;
-    }
-
-    // Đối với Oppo/Realme, kiểm tra thêm quyền tự khởi động
-    if (_isOppoOrRealme) {
-      result['autoStart'] = await _checkOppoAutoStart();
-    } else {
-      result['autoStart'] = true;
     }
 
     debugPrint('[Notif] Permissions: $result');
@@ -191,13 +173,13 @@ class NotificationService {
 
   Future<Map<String, bool>> checkPermissions() async {
     if (!Platform.isAndroid) {
-      return {'notification': true, 'exactAlarm': true, 'battery': true, 'autoStart': true};
+      return {'notification': true, 'exactAlarm': true, 'battery': true};
     }
 
     final ap = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
-    final result = {
+    return {
       'notification': _sdkVersion < 33 ||
           (await Permission.notification.status).isGranted,
       'exactAlarm': (_sdkVersion != 31 && _sdkVersion != 32) ||
@@ -205,15 +187,6 @@ class NotificationService {
       'battery':
           (await Permission.ignoreBatteryOptimizations.status).isGranted,
     };
-    
-    // Kiểm tra quyền tự khởi động cho Oppo/Realme
-    if (_isOppoOrRealme) {
-      result['autoStart'] = await _checkOppoAutoStart();
-    } else {
-      result['autoStart'] = true;
-    }
-
-    return result;
   }
 
   // ─── Schedule notification ─────────────────────────────────────────────────
@@ -472,28 +445,6 @@ class NotificationService {
 
   // ─── Oppo/Realme ColorOS Specific Methods ───────────────────────────────────
 
-  /// Mở cài đặt pin của ColorOS cho Oppo/Realme
-  Future<void> _openOppoBatterySettings() async {
-    try {
-      // Mở cài đặt pin chung trước
-      await Permission.ignoreBatteryOptimizations.request();
-      
-      // Thử mở các activity cụ thể của ColorOS
-      // Lưu ý: Có thể cần người dùng thao tác thủ công
-      debugPrint('[Notif] Opening battery optimization settings');
-    } catch (e) {
-      debugPrint('[Notif] Error opening battery settings: $e');
-    }
-  }
-
-  /// Kiểm tra quyền tự khởi động trên Oppo/Realme
-  /// Lưu ý: Không có API chính thức, chỉ có thể hướng dẫn người dùng
-  Future<bool> _checkOppoAutoStart() async {
-    // Trả về true mặc định vì không có cách kiểm tra chính xác
-    // Sẽ hướng dẫn người dùng trong UI
-    return true;
-  }
-
   /// Lấy hướng dẫn cài đặt cho Oppo/Realme
   String getOppoRealmeGuide() {
     return '''
@@ -512,9 +463,6 @@ class NotificationService {
 3. Bật báo thức (QUAN TRỌNG):
    Cài đặt → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở → Bật Lịch Việt
    (Đây là cách Google Calendar hoạt động - không cần app chạy)
-
-4. Tự khởi động (ColorOS đặc biệt):
-   Cài đặt → Ứng dụng → Lịch Việt → Quyền → Tự khởi động → Bật
 
 💡 TIPS:
 - KHÔNG cần bật "Chạy trong nền" - tốn pin

@@ -147,9 +147,16 @@ class _TodayScreenState extends State<TodayScreen> {
     bool isHD,
   ) {
     final screenW = MediaQuery.sizeOf(context).width;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final topInset = MediaQuery.paddingOf(context).top;
+    final bottomInset = 72 + MediaQuery.paddingOf(context).bottom;
+
+    // Tính toán chiều cao cho phần lịch chính
+    final calendarBodyHeight = screenH - topInset - 80 - bottomInset; // 80 là ước tính header + events
 
     return Container(
       margin: const EdgeInsets.all(12),
+      height: calendarBodyHeight,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -387,7 +394,6 @@ class _TodayScreenState extends State<TodayScreen> {
     return Container(
       color: const Color(0xFFFFF3E0),
       width: double.infinity,
-      height: double.infinity,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         child: Row(

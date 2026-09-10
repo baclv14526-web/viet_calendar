@@ -331,10 +331,9 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget _buildWeekdayRow(ThemeData theme) {
     final thu = DateFormat('EEEE', 'vi_VN').format(_now).toUpperCase();
     final thuHan = CanChiHelper.thuTrongTuanHan(_now);
-    final isWeekend = _now.weekday >= 6;
-    final color = isWeekend ? const Color(0xFFD32F2F) : theme.colorScheme.primary;
 
-    return Padding(
+    return Container(
+      color: const Color(0xFF1565C0),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -342,18 +341,18 @@ class _TodayScreenState extends State<TodayScreen> {
           // Thứ tiếng Việt đơn giản
           Text(
             _thuViet(_now.weekday),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
-              color: color.withOpacity(0.7),
+              color: Colors.white70,
               fontWeight: FontWeight.w500,
             ),
           ),
           // Thứ viết đầy đủ
           Text(
             thu,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
-              color: color,
+              color: Colors.white,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
             ),
@@ -361,9 +360,9 @@ class _TodayScreenState extends State<TodayScreen> {
           // Thứ tiếng Hán
           Text(
             thuHan,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: color.withOpacity(0.7),
+              color: Colors.white70,
               fontFamily: 'serif',
             ),
           ),
@@ -374,8 +373,8 @@ class _TodayScreenState extends State<TodayScreen> {
 
   String _thuViet(int weekday) {
     const map = {
-      1: 'Thứ Hai', 2: 'Thứ Ba', 3: 'Thứ Tư',
-      4: 'Thứ Năm', 5: 'Thứ Sáu', 6: 'Thứ Bảy', 7: 'Chủ Nhật',
+      1: 'Monday', 2: 'Tuesday', 3: 'Wednesday',
+      4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday',
     };
     return map[weekday] ?? '';
   }

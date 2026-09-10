@@ -320,7 +320,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     final dotColors = dayEvents.take(3).map((e) => e.color).toList();
-    final radius = showLunar ? 10.0 : 20.0;
+    // Hình viên nang cân đối (capsule shape)
+    final radius = showLunar ? 8.0 : 14.0;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),

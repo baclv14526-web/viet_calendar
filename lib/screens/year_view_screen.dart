@@ -356,7 +356,8 @@ class _DayCell extends StatelessWidget {
                     color: isToday
                         ? theme.colorScheme.primary
                         : Colors.transparent,
-                    shape: BoxShape.circle,
+                    // Hình viên nang cân đối (capsule shape)
+                    borderRadius: BorderRadius.circular(8),
                     // Viền mảnh cho ngày lễ (không phải hôm nay)
                     border: !isToday && hasHoliday
                         ? Border.all(

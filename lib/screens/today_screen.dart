@@ -642,7 +642,10 @@ class _TodayScreenState extends State<TodayScreen> {
       ),
     ).then((_) {
       if (!mounted) return;
-      context.read<CalendarBloc>().add(LoadCalendarEvents(_now));
+      // Sử dụng DateTime.now() hiện tại thay vì _now đã cũ
+      final currentDate = DateTime.now();
+      setState(() => _now = currentDate);
+      context.read<CalendarBloc>().add(LoadCalendarEvents(currentDate));
     });
   }
 }

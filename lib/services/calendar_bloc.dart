@@ -266,7 +266,12 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
       await _notifications.scheduleEventNotification(event.event);
       // Xóa cache tháng liên quan để force reload
       _invalidateMonth(event.event.date.year, event.event.date.month);
-      add(LoadCalendarEvents(state.focusedMonth));
+      // Reload tháng của sự kiện được thêm và cả focusedMonth hiện tại
+      add(LoadCalendarEvents(event.event.date));
+      if (event.event.date.month != state.focusedMonth.month ||
+          event.event.date.year != state.focusedMonth.year) {
+        add(LoadCalendarEvents(state.focusedMonth));
+      }
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }

@@ -196,83 +196,89 @@ class NotificationService {
   Future<DateTime?> scheduleEventNotification(CalendarEvent event) async {
     if (!event.hasNotification) return null;
 
-    final notifTime = _calcNotifTime(event);
-    if (notifTime == null) return null;
+    try {
+      final notifTime = _calcNotifTime(event);
+      if (notifTime == null) return null;
 
-    debugPrint('[Notif] Scheduling "${event.title}" → $notifTime');
+      debugPrint('[Notif] Scheduling "${event.title}" → $notifTime');
 
-    final isHoliday = event.type == EventType.holiday ||
-        event.type == EventType.lunarHoliday;
-    final notifId = event.id.hashCode.abs() % 2147483647;
+      final isHoliday = event.type == EventType.holiday ||
+          event.type == EventType.lunarHoliday;
+      final notifId = event.id.hashCode.abs() % 2147483647;
 
-    // Tạo TZDateTime trực tiếp với timezone Vietnam
-    // QUAN TRỌNG: không dùng tz.TZDateTime.from() vì có thể sai khi
-    // device timezone khác Asia/Ho_Chi_Minh
-    final tzTime = tz.TZDateTime(
-      tz.local,
-      notifTime.year,
-      notifTime.month,
-      notifTime.day,
-      notifTime.hour,
-      notifTime.minute,
-      0,
-    );
+      // Tạo TZDateTime trực tiếp với timezone Vietnam
+      // QUAN TRỌNG: không dùng tz.TZDateTime.from() vì có thể sai khi
+      // device timezone khác Asia/Ho_Chi_Minh
+      final tzTime = tz.TZDateTime(
+        tz.local,
+        notifTime.year,
+        notifTime.month,
+        notifTime.day,
+        notifTime.hour,
+        notifTime.minute,
+        0,
+      );
 
-    final details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        isHoliday ? 'viet_calendar_holidays' : 'viet_calendar_events',
-        isHoliday ? 'Ngày lễ' : 'Sự kiện lịch',
-        channelDescription: isHoliday
-            ? 'Thông báo ngày lễ'
-            : 'Nhắc nhở sự kiện trong lịch Việt',
-        importance: isHoliday ? Importance.high : Importance.max,
-        priority: isHoliday ? Priority.high : Priority.max,
-        // Hiển thị trên màn hình khóa với nội dung đầy đủ
-        visibility: NotificationVisibility.public,
-        // Bật âm thanh và rung
-        playSound: true,
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
-        // Màu sắc
-        color: event.color,
-        // BigText để hiện đủ nội dung
-        styleInformation: BigTextStyleInformation(
-          _buildBody(event),
-          contentTitle: event.title,
-          summaryText: 'Lịch Việt',
+      final details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          isHoliday ? 'viet_calendar_holidays' : 'viet_calendar_events',
+          isHoliday ? 'Ngày lễ' : 'Sự kiện lịch',
+          channelDescription: isHoliday
+              ? 'Thông báo ngày lễ'
+              : 'Nhắc nhở sự kiện trong lịch Việt',
+          importance: isHoliday ? Importance.high : Importance.max,
+          priority: isHoliday ? Priority.high : Priority.max,
+          // Hiển thị trên màn hình khóa với nội dung đầy đủ
+          visibility: NotificationVisibility.public,
+          // Bật âm thanh và rung
+          playSound: true,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
+          // Màu sắc
+          color: event.color,
+          // BigText để hiện đủ nội dung
+          styleInformation: BigTextStyleInformation(
+            _buildBody(event),
+            contentTitle: event.title,
+            summaryText: 'Lịch Việt',
+          ),
+          category: AndroidNotificationCategory.reminder,
+          autoCancel: true,
+          icon: '@mipmap/ic_launcher',
+          // fullScreenIntent: tắt để tránh crash trên một số thiết bị
+          // Đã test thấy fullScreenIntent có thể gây crash nếu thiếu quyền
+          fullScreenIntent: false,
         ),
-        category: AndroidNotificationCategory.reminder,
-        autoCancel: true,
-        icon: '@mipmap/ic_launcher',
-        // fullScreenIntent: hiện kể cả khi màn hình tắt (Android 9+)
-        // Chỉ bật cho sự kiện quan trọng, không phải ngày lễ
-        fullScreenIntent: !isHoliday,
-      ),
-      iOS: const DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.timeSensitive,
-      ),
-    );
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          interruptionLevel: InterruptionLevel.timeSensitive,
+        ),
+      );
 
-    // Chọn schedule mode tốt nhất
-    final mode = await _scheduleMode();
+      // Chọn schedule mode tốt nhất
+      final mode = await _scheduleMode();
 
-    await _plugin.zonedSchedule(
-      notifId,
-      event.title,
-      _buildBody(event),
-      tzTime,
-      details,
-      androidScheduleMode: mode,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: event.id,
-    );
+      await _plugin.zonedSchedule(
+        notifId,
+        event.title,
+        _buildBody(event),
+        tzTime,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: event.id,
+      );
 
-    debugPrint('[Notif] ✅ Scheduled id=$notifId mode=$mode time=$tzTime');
-    return notifTime;
+      debugPrint('[Notif] ✅ Scheduled id=$notifId mode=$mode time=$tzTime');
+      return notifTime;
+    } catch (e, stackTrace) {
+      debugPrint('[Notif] ❌ Error scheduling event "${event.title}": $e');
+      debugPrint('[Notif] Stack trace: $stackTrace');
+      return null;
+    }
   }
 
   Future<AndroidScheduleMode> _scheduleMode() async {
@@ -355,36 +361,58 @@ class NotificationService {
   // ─── Test 5 giây ──────────────────────────────────────────────────────────
 
   Future<void> scheduleTestIn5Seconds() async {
-    final mode = await _scheduleMode();
-    final testTime = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
+    try {
+      debugPrint('[Notif] Starting 5s test...');
+      
+      final mode = await _scheduleMode();
+      debugPrint('[Notif] Schedule mode: $mode');
+      
+      final testTime = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 5));
+      debugPrint('[Notif] Test time: $testTime');
 
-    await _plugin.zonedSchedule(
-      888888,
-      '🔔 Lịch Việt – Test thành công!',
-      'Hệ thống thông báo hoạt động đúng. Mode: $mode',
-      testTime,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'viet_calendar_events',
-          'Sự kiện lịch',
-          importance: Importance.max,
-          priority: Priority.max,
-          visibility: NotificationVisibility.public,
-          playSound: true,
-          enableVibration: true,
-          fullScreenIntent: true,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentSound: true,
-          interruptionLevel: InterruptionLevel.timeSensitive,
-        ),
-      ),
-      androidScheduleMode: mode,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-    debugPrint('[Notif] Test 5s: mode=$mode time=$testTime');
+      final androidDetails = AndroidNotificationDetails(
+        'viet_calendar_events',
+        'Sự kiện lịch',
+        channelDescription: 'Test thông báo',
+        importance: Importance.max,
+        priority: Priority.max,
+        visibility: NotificationVisibility.public,
+        playSound: true,
+        enableVibration: true,
+        // Tắt fullScreenIntent cho test để tránh crash
+        fullScreenIntent: false,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+
+      final details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      debugPrint('[Notif] Scheduling test notification...');
+      
+      await _plugin.zonedSchedule(
+        888888,
+        '🔔 Lịch Việt – Test thành công!',
+        'Hệ thống thông báo hoạt động đúng. Mode: $mode',
+        testTime,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      
+      debugPrint('[Notif] ✅ Test 5s scheduled successfully: mode=$mode time=$testTime');
+    } catch (e, stackTrace) {
+      debugPrint('[Notif] ❌ Error in scheduleTestIn5Seconds: $e');
+      debugPrint('[Notif] Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   // ─── Time calculation ──────────────────────────────────────────────────────

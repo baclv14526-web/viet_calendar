@@ -484,14 +484,25 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                     icon: const Icon(Icons.alarm, size: 16),
                     label: const Text('Test 5 giây', style: TextStyle(fontSize: 12)),
                     onPressed: () async {
-                      await widget.ns.scheduleTestIn5Seconds();
-                      await _reload();
-                      if (mounted) {
-                        widget.messenger.showSnackBar(const SnackBar(
-                          content: Text(
-                              '⏱ Chờ 5 giây... nếu không thấy → thiếu quyền pin/báo thức!'),
-                          duration: Duration(seconds: 7),
-                        ));
+                      try {
+                        await widget.ns.scheduleTestIn5Seconds();
+                        await _reload();
+                        if (mounted) {
+                          widget.messenger.showSnackBar(const SnackBar(
+                            content: Text(
+                                '⏱ Chờ 5 giây... nếu không thấy → thiếu quyền pin/báo thức!'),
+                            duration: Duration(seconds: 7),
+                          ));
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          widget.messenger.showSnackBar(SnackBar(
+                            content: Text('❌ Lỗi test: $e'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 5),
+                          ));
+                        }
+                        debugPrint('[Settings] Test error: $e');
                       }
                     },
                   ),

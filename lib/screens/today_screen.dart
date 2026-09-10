@@ -333,7 +333,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final thuHan = CanChiHelper.thuTrongTuanHan(_now);
 
     return Container(
-      color: const Color(0xFF1565C0),
+      color: const Color(0xFF1A237E),  // Indigo 900
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -391,7 +391,13 @@ class _TodayScreenState extends State<TodayScreen> {
     final thangHan = CanChiHelper.thangHanSimple[lunar.month - 1];
 
     return Container(
-      color: const Color(0xFFFFF3E0),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+      ),
       width: double.infinity,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),

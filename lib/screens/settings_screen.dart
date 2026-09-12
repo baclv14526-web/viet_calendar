@@ -558,8 +558,9 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _permissionTile({
     required String label,

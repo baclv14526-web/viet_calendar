@@ -333,7 +333,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final thuHan = CanChiHelper.thuTrongTuanHan(_now);
 
     return Container(
-      color: const Color(0xFF0D47A1)  // Blue 900
+      color: const Color(0xFF0D47A1),  // Blue 900
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,

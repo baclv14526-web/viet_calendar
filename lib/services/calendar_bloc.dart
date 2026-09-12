@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../models/calendar_event.dart';
@@ -263,7 +264,14 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
   ) async {
     try {
       await _db.insertEvent(event.event);
-      await _notifications.scheduleEventNotification(event.event);
+      final scheduled =
+          await _notifications.scheduleEventNotification(event.event);
+      if (event.event.hasNotification && scheduled == null) {
+        debugPrint(
+          '[CalendarBloc] Notification NOT scheduled for '
+          '"${event.event.title}". Check notification/exact-alarm permissions.',
+        );
+      }
       // Xóa cache tháng liên quan để force reload
       _invalidateMonth(event.event.date.year, event.event.date.month);
       // Reload tháng của sự kiện được thêm và cả focusedMonth hiện tại

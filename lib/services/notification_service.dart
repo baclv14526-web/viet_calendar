@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import '../models/calendar_event.dart';
+import '../utils/vietnamese_holidays.dart';
 
 class NotificationService {
   static final NotificationService _instance =
@@ -25,6 +26,10 @@ class NotificationService {
   
   // Timezone constants - ĐỊNH NGHĨA TRƯỚC KHI SỬ DỤNG
   static const String _hanoiZone = 'Asia/Ho_Chi_Minh';
+  // v2 prevents an old, user-muted/low-importance channel from surviving
+  // an earlier buggy build.
+  static const String _eventChannelId = 'viet_calendar_events_v2';
+  static const String _holidayChannelId = 'viet_calendar_holidays_v2';
   tz.Location get _hanoi => tz.getLocation(_hanoiZone);
   
   // Getter để truy cập từ bên ngoài
@@ -89,7 +94,7 @@ class NotificationService {
 
     // HIGH importance channel - bắt buộc để hiện banner + âm thanh
     await ap.createNotificationChannel(const AndroidNotificationChannel(
-      'viet_calendar_events',
+      _eventChannelId,
       'Sự kiện lịch',
       description: 'Thông báo nhắc nhở sự kiện trong lịch Việt',
       importance: Importance.max, // MAX để đảm bảo hiện banner
@@ -101,10 +106,10 @@ class NotificationService {
     ));
 
     await ap.createNotificationChannel(const AndroidNotificationChannel(
-      'viet_calendar_holidays',
+      _holidayChannelId,
       'Ngày lễ',
       description: 'Thông báo ngày lễ và sự kiện đặc biệt',
-      importance: Importance.high,
+      importance: Importance.max,
       enableVibration: true,
       playSound: true,
       showBadge: true,
@@ -148,13 +153,10 @@ class NotificationService {
           await ap?.requestNotificationsPermission() ?? false;
     }
 
-    // Android 12+ exact alarm.
-    //
-    // IMPORTANT:
-    // Do NOT silently fall back to inexact scheduling. A calendar reminder
-    // that promises an exact time should either have exact-alarm access or
-    // report that the user still needs to enable it.
-    if (_sdkVersion >= 31) {
+    // Android 12-32: SCHEDULE_EXACT_ALARM is user-controlled.
+    // Android 33+: this calendar app declares USE_EXACT_ALARM, so the system
+    // grants exact-alarm access at install time when the app qualifies.
+    if (_sdkVersion >= 31 && _sdkVersion <= 32) {
       final ap = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
@@ -181,6 +183,9 @@ class NotificationService {
           'User must enable "Alarms & reminders".',
         );
       }
+    } else if (_sdkVersion >= 33) {
+      result['exactAlarm'] =
+          await ap?.canScheduleExactNotifications() ?? true;
     }
 
     debugPrint('[Notif] Permissions: $result');
@@ -273,7 +278,7 @@ class NotificationService {
 
       final details = NotificationDetails(
         android: AndroidNotificationDetails(
-          isHoliday ? 'viet_calendar_holidays' : 'viet_calendar_events',
+          isHoliday ? _holidayChannelId : _eventChannelId,
           isHoliday ? 'Ngày lễ' : 'Sự kiện lịch',
           channelDescription: isHoliday
               ? 'Thông báo ngày lễ'
@@ -356,6 +361,42 @@ class NotificationService {
     }
   }
 
+
+  /// Re-schedules all persisted personal events and built-in Vietnamese
+  /// holidays. This must run after app startup because the original app only
+  /// scheduled an event at the moment it was created.
+  Future<void> rescheduleAll(Iterable<CalendarEvent> events) async {
+    await initialize();
+
+    final permissions = await checkPermissions();
+    if (Platform.isAndroid &&
+        (!permissions['notification']! || !permissions['exactAlarm']!)) {
+      debugPrint('[Notif] rescheduleAll skipped: permissions=$permissions');
+      return;
+    }
+
+    var count = 0;
+
+    for (final event in events) {
+      if (await scheduleEventNotification(event) != null) {
+        count++;
+      }
+    }
+
+    // Built-in holidays are generated for the calendar UI and are NOT stored
+    // in SQLite. They therefore need explicit scheduling too.
+    final now = tz.TZDateTime.now(_hanoi);
+    for (final year in [now.year, now.year + 1]) {
+      for (final holiday in VietnameseHolidays.getHolidaysForYear(year)) {
+        if (await scheduleEventNotification(holiday) != null) {
+          count++;
+        }
+      }
+    }
+
+    debugPrint('[Notif] rescheduleAll: scheduled=$count');
+  }
+
   int _stableNotificationId(String value) {
     // FNV-1a 32-bit. Deterministic across app launches.
     var hash = 0x811c9dc5;
@@ -393,7 +434,7 @@ class NotificationService {
       body,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'viet_calendar_events',
+          _eventChannelId,
           'Sự kiện lịch',
           importance: Importance.max,
           priority: Priority.max,
@@ -426,7 +467,7 @@ class NotificationService {
       debugPrint('[Notif] Test time: $testTime');
 
       final androidDetails = AndroidNotificationDetails(
-        'viet_calendar_events',
+        _eventChannelId,
         'Sự kiện lịch',
         channelDescription: 'Test thông báo',
         importance: Importance.max,

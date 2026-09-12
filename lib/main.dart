@@ -39,6 +39,13 @@ void main() async {
   await notificationService.initialize();
   await _requestPermissions(notificationService);
 
+  // IMPORTANT: events already stored in SQLite were previously only shown
+  // by the calendar; they were never scheduled again after app restart.
+  // Built-in Vietnamese holidays are also not stored in SQLite.
+  final database = DatabaseService();
+  final existingEvents = await database.getAllEvents();
+  await notificationService.rescheduleAll(existingEvents);
+
   runApp(VietCalendarApp(notificationService: notificationService));
 }
 

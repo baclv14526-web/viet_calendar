@@ -511,45 +511,48 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
             ),
             const SizedBox(height: 16),
             
-            // Oppo/Realme specific guide
-            if (isOppoRealme) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.phone_android, 
-                            size: 16, color: Colors.green[700]),
-                        const SizedBox(width: 8),
-                        Text('Phát hiện Oppo/Realme (ColorOS)',
-                            style: TextStyle(
-                                fontSize: 13, 
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green[700])),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '📱 ColorOS yêu cầu cấu hình đặc biệt (Giống Google Calendar):',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.ns.getOppoRealmeGuide(),
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                    ),
-                  ],
-                ),
+            // OEM specific guide (Xiaomi, Oppo, Realme, Samsung, Vivo)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
-              const SizedBox(height: 16),
-            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.tips_and_updates, 
+                          size: 16, color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                      Text('Hiện thông báo trên Màn hình khóa & Banner nổi',
+                          style: TextStyle(
+                              fontSize: 13, 
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[800])),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.ns.getOppoRealmeGuide(),
+                    style: const TextStyle(fontSize: 11, height: 1.4),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.settings, size: 16),
+                      label: const Text('Mở Cài đặt Ứng dụng trong Hệ thống',
+                          style: TextStyle(fontSize: 12)),
+                      onPressed: () => openAppSettings(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

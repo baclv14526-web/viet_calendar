@@ -54,11 +54,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
   void initState() {
     super.initState();
     final e = widget.event;
+    final now = DateTime.now();
+    final defaultStart = TimeOfDay(hour: (now.hour + 1) % 24, minute: 0);
+    final defaultEnd = TimeOfDay(hour: (now.hour + 2) % 24, minute: 0);
+
     _titleCtrl = TextEditingController(text: e?.title ?? '');
     _descCtrl = TextEditingController(text: e?.description ?? '');
     _selectedDate = e?.date ?? widget.initialDate;
-    _startTime = e?.startTime;
-    _endTime = e?.endTime;
+    _startTime = e?.startTime ?? (e == null ? defaultStart : null);
+    _endTime = e?.endTime ?? (e == null ? defaultEnd : null);
     _eventType = e?.type ?? EventType.personal;
     _repeatType = e?.repeatType ?? RepeatType.none;
     _color = e?.color ?? const Color(0xFF2196F3);
@@ -483,6 +487,20 @@ class _AddEventScreenState extends State<AddEventScreen> {
       context.read<CalendarBloc>().add(AddEvent(event));
     }
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      final msg = _hasNotification
+          ? (_isAllDay
+              ? 'Đã lên lịch nhắc nhở lúc 08:00'
+              : 'Đã lên lịch nhắc nhở trước $_notificationMinutes phút')
+          : 'Đã lưu sự kiện (không nhắc nhở)';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${event.title} • $msg'),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    }
   }
 }

@@ -26,10 +26,9 @@ class NotificationService {
   
   // Timezone constants - ĐỊNH NGHĨA TRƯỚC KHI SỬ DỤNG
   static const String _hanoiZone = 'Asia/Ho_Chi_Minh';
-  // v2 prevents an old, user-muted/low-importance channel from surviving
-  // an earlier buggy build.
-  static const String _eventChannelId = 'viet_calendar_events_v2';
-  static const String _holidayChannelId = 'viet_calendar_holidays_v2';
+  // v3 ensures updated high-importance channels with heads-up banner and lock screen support
+  static const String _eventChannelId = 'viet_calendar_events_v3';
+  static const String _holidayChannelId = 'viet_calendar_holidays_v3';
   tz.Location get _hanoi => tz.getLocation(_hanoiZone);
   
   // Getter để truy cập từ bên ngoài
@@ -79,12 +78,8 @@ class NotificationService {
 
     await _createChannels();
     
-    // KHÔNG dùng foreground service - dùng AlarmManager như Google Calendar
-    // Foreground service chỉ cần cho các trường hợp đặc biệt
-    // Đối với thông báo lịch, AlarmClock mode đã đủ mạnh
-    
     _initialized = true;
-    debugPrint('[Notif] Using AlarmManager (like Google Calendar) - no foreground service needed');
+    debugPrint('[Notif] NotificationService initialized successfully');
   }
 
   Future<void> _createChannels() async {
@@ -92,12 +87,12 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (ap == null) return;
 
-    // HIGH importance channel - bắt buộc để hiện banner + âm thanh
+    // MAX importance channel - bắt buộc để hiện banner pop-up và trên màn hình khóa
     await ap.createNotificationChannel(const AndroidNotificationChannel(
       _eventChannelId,
       'Sự kiện lịch',
       description: 'Thông báo nhắc nhở sự kiện trong lịch Việt',
-      importance: Importance.max, // MAX để đảm bảo hiện banner
+      importance: Importance.max, // MAX để đảm bảo hiện banner trên màn hình chính & khóa
       enableVibration: true,
       playSound: true,
       showBadge: true,
@@ -113,9 +108,11 @@ class NotificationService {
       enableVibration: true,
       playSound: true,
       showBadge: true,
+      enableLights: true,
+      ledColor: Color(0xFFD32F2F),
     ));
 
-    debugPrint('[Notif] Channels created');
+    debugPrint('[Notif] Channels created (v3)');
   }
 
   static void _onTapped(NotificationResponse r) =>
@@ -131,9 +128,6 @@ class NotificationService {
     final result = <String, bool>{
       'notification': true,
       'exactAlarm': true,
-      // Battery optimisation exemption is NOT required for exact alarms.
-      // Keep this false only as an informational status; do not request it
-      // automatically because OEM/Play policies may restrict this permission.
       'battery': true,
     };
 
@@ -154,9 +148,7 @@ class NotificationService {
           await ap?.requestNotificationsPermission() ?? false;
     }
 
-    // Android 12-32: SCHEDULE_EXACT_ALARM is user-controlled.
-    // Android 33+: this calendar app declares USE_EXACT_ALARM, so the system
-    // grants exact-alarm access at install time when the app qualifies.
+    // Android 12-32: SCHEDULE_EXACT_ALARM
     if (_sdkVersion >= 31 && _sdkVersion <= 32) {
       var canExact =
           await ap?.canScheduleExactNotifications() ?? false;
@@ -170,17 +162,9 @@ class NotificationService {
         }
       }
 
-      // Re-check after returning from Settings.
       canExact =
           await ap?.canScheduleExactNotifications() ?? canExact;
       result['exactAlarm'] = canExact;
-
-      if (!canExact) {
-        debugPrint(
-          '[Notif] Exact alarms are NOT available. '
-          'User must enable "Alarms & reminders".',
-        );
-      }
     } else if (_sdkVersion >= 33) {
       result['exactAlarm'] =
           await ap?.canScheduleExactNotifications() ?? true;
@@ -209,7 +193,6 @@ class NotificationService {
     final exactAlarm = _sdkVersion < 31 ||
         (await ap?.canScheduleExactNotifications() ?? false);
 
-    // Do not treat battery optimisation as a hard requirement.
     return {
       'notification': notification,
       'exactAlarm': exactAlarm,
@@ -238,12 +221,12 @@ class NotificationService {
         notifTime.day,
         notifTime.hour,
         notifTime.minute,
-        0,
+        notifTime.second,
       );
 
       final now = tz.TZDateTime.now(_hanoi);
       if (!tzTime.isAfter(now)) {
-        debugPrint('[Notif] Skip: scheduled time is not in the future: $tzTime');
+        debugPrint('[Notif] Skip: scheduled time is not in the future: $tzTime (now: $now)');
         return null;
       }
 
@@ -254,24 +237,12 @@ class NotificationService {
           debugPrint('[Notif] ❌ POST_NOTIFICATIONS is not granted');
           return null;
         }
-
-        if (_sdkVersion >= 31 && !permissions['exactAlarm']!) {
-          debugPrint(
-            '[Notif] ❌ Exact alarm permission is not granted. '
-            'Refusing inexact fallback.',
-          );
-          return null;
-        }
       }
 
       final isHoliday = event.type == EventType.holiday ||
           event.type == EventType.lunarHoliday;
 
-      // Dart String.hashCode is not a persistent storage ID. Use a small,
-      // deterministic FNV-1a hash so the same event always maps to the same
-      // notification ID across app restarts/versions/platforms.
       final notifId = _stableNotificationId(event.id);
-
       final body = _buildBody(event);
 
       final details = NotificationDetails(
@@ -281,9 +252,9 @@ class NotificationService {
           channelDescription: isHoliday
               ? 'Thông báo ngày lễ'
               : 'Thông báo nhắc nhở sự kiện trong lịch Việt',
-          importance: isHoliday ? Importance.high : Importance.max,
-          priority: isHoliday ? Priority.high : Priority.max,
-          visibility: NotificationVisibility.public,
+          importance: Importance.max,
+          priority: Priority.max,
+          visibility: NotificationVisibility.public, // Hiển thị trên màn hình khóa
           playSound: true,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
@@ -297,6 +268,7 @@ class NotificationService {
           autoCancel: true,
           icon: '@mipmap/ic_launcher',
           fullScreenIntent: false,
+          ticker: event.title,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -306,15 +278,14 @@ class NotificationService {
         ),
       );
 
-      // Replace an old schedule for the same event before scheduling the new
-      // one. This prevents duplicate notifications after editing an event.
+      // Thay thế thông báo cũ của cùng event
       await _plugin.cancel(notifId);
 
-      // exactAllowWhileIdle is preferable for calendar reminders:
-      // exact timing + delivery while Android is in Doze/low-power idle.
-      //
-      // It still requires exact-alarm access on Android 12+.
-      const mode = AndroidScheduleMode.exactAllowWhileIdle;
+      // Sử dụng exactAllowWhileIdle nếu có quyền, fallback inexactAllowWhileIdle nếu chưa cấp quyền
+      final canExact = permissions['exactAlarm'] ?? false;
+      final mode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
 
       debugPrint(
         '[Notif] Scheduling "${event.title}" '
@@ -333,9 +304,6 @@ class NotificationService {
         payload: event.id,
       );
 
-      // Verify that the plugin still sees this request as pending.
-      // This does not prove Android will display it, but catches failed
-      // scheduling immediately.
       final pending = await _plugin.pendingNotificationRequests();
       final found = pending.any((n) => n.id == notifId);
 
@@ -347,7 +315,7 @@ class NotificationService {
       } else {
         debugPrint(
           '[Notif] ✅ Scheduled and verified pending: '
-          'id=$notifId time=$tzTime',
+          'id=$notifId time=$tzTime mode=$mode',
         );
       }
 
@@ -361,15 +329,13 @@ class NotificationService {
 
 
   /// Re-schedules all persisted personal events and built-in Vietnamese
-  /// holidays. This must run after app startup because the original app only
-  /// scheduled an event at the moment it was created.
+  /// holidays.
   Future<void> rescheduleAll(Iterable<CalendarEvent> events) async {
     await initialize();
 
     final permissions = await checkPermissions();
-    if (Platform.isAndroid &&
-        (!permissions['notification']! || !permissions['exactAlarm']!)) {
-      debugPrint('[Notif] rescheduleAll skipped: permissions=$permissions');
+    if (Platform.isAndroid && !permissions['notification']!) {
+      debugPrint('[Notif] rescheduleAll skipped: POST_NOTIFICATIONS not granted');
       return;
     }
 
@@ -381,8 +347,6 @@ class NotificationService {
       }
     }
 
-    // Built-in holidays are generated for the calendar UI and are NOT stored
-    // in SQLite. They therefore need explicit scheduling too.
     final now = tz.TZDateTime.now(_hanoi);
     for (final year in [now.year, now.year + 1]) {
       for (final holiday in VietnameseHolidays.getHolidaysForYear(year)) {
@@ -396,15 +360,11 @@ class NotificationService {
   }
 
   int _stableNotificationId(String value) {
-    // FNV-1a 32-bit. Deterministic across app launches.
     var hash = 0x811c9dc5;
     for (final unit in value.codeUnits) {
       hash ^= unit;
       hash = (hash * 0x01000193) & 0x7fffffff;
     }
-
-    // Android notification IDs can be any signed int; keep 1 reserved
-    // as a safe non-zero value.
     return hash == 0 ? 1 : hash;
   }
 
@@ -426,6 +386,7 @@ class NotificationService {
     required String body,
     Color color = const Color(0xFF1565C0),
   }) async {
+    await initialize();
     await _plugin.show(
       DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
       title,
@@ -440,6 +401,8 @@ class NotificationService {
           color: color,
           playSound: true,
           enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
+          category: AndroidNotificationCategory.reminder,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -454,13 +417,16 @@ class NotificationService {
 
   Future<void> scheduleTestIn5Seconds() async {
     try {
+      await initialize();
       debugPrint('[Notif] Starting 5s test...');
       
-      // Sử dụng exactAllowWhileIdle cho test như event chính
-      const mode = AndroidScheduleMode.exactAllowWhileIdle;
-      debugPrint('[Notif] Schedule mode: $mode');
+      final permissions = await checkPermissions();
+      final canExact = permissions['exactAlarm'] ?? false;
+      final mode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+      debugPrint('[Notif] Test schedule mode: $mode');
       
-      // Sử dụng _hanoi timezone để nhất quán
       final testTime = tz.TZDateTime.now(_hanoi).add(const Duration(seconds: 5));
       debugPrint('[Notif] Test time: $testTime');
 
@@ -473,7 +439,8 @@ class NotificationService {
         visibility: NotificationVisibility.public,
         playSound: true,
         enableVibration: true,
-        // Tắt fullScreenIntent cho test để tránh crash
+        vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
+        category: AndroidNotificationCategory.reminder,
         fullScreenIntent: false,
       );
 
@@ -488,12 +455,10 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      debugPrint('[Notif] Scheduling test notification...');
-      
       await _plugin.zonedSchedule(
         888888,
         '🔔 Lịch Việt – Test thành công!',
-        'Hệ thống thông báo hoạt động đúng. Mode: $mode',
+        'Thông báo đã kích hoạt chính xác trên màn hình!',
         testTime,
         details,
         androidScheduleMode: mode,
@@ -505,7 +470,6 @@ class NotificationService {
     } catch (e, stackTrace) {
       debugPrint('[Notif] ❌ Error in scheduleTestIn5Seconds: $e');
       debugPrint('[Notif] Stack trace: $stackTrace');
-      // Không rethrow để tránh crash UI
     }
   }
 
@@ -515,9 +479,6 @@ class NotificationService {
     final d = event.date;
     final minsBefore = event.notificationMinutesBefore ?? 30;
 
-    // All calendar calculations are explicitly in Hanoi time. This prevents
-    // a phone whose system timezone is temporarily changed from moving the
-    // reminder to another wall-clock time.
     final now = tz.TZDateTime.now(_hanoi);
     final today = tz.TZDateTime(_hanoi, now.year, now.month, now.day);
     final eventDay = tz.TZDateTime(_hanoi, d.year, d.month, d.day);
@@ -532,12 +493,14 @@ class NotificationService {
         d.day,
         event.startTime!.hour,
         event.startTime!.minute,
+        0,
       );
 
       var notifTime = startDt.subtract(Duration(minutes: minsBefore));
 
       if (notifTime.isBefore(now) && startDt.isAfter(now)) {
-        notifTime = now.add(const Duration(minutes: 1));
+        // Nếu giờ nhắc nhở đã qua nhưng sự kiện chưa bắt đầu -> nhắc sau 10 giây
+        notifTime = now.add(const Duration(seconds: 10));
       } else if (!notifTime.isAfter(now)) {
         return null;
       }
@@ -548,10 +511,11 @@ class NotificationService {
         notifTime.day,
         notifTime.hour,
         notifTime.minute,
+        notifTime.second,
       );
     }
 
-    // All-day event: default reminder at 08:00 Hanoi time.
+    // Sự kiện cả ngày: mặc định nhắc lúc 08:00
     final prevDay = minsBefore >= 1440
         ? eventDay.subtract(const Duration(days: 1))
         : eventDay;
@@ -563,10 +527,12 @@ class NotificationService {
       prevDay.day,
       8,
       0,
+      0,
     );
 
     if (!notifTime.isAfter(now) && !eventDay.isBefore(today)) {
-      notifTime = now.add(const Duration(minutes: 1));
+      // Nếu là hôm nay và đã quá 8:00 sáng -> nhắc sau 10 giây
+      notifTime = now.add(const Duration(seconds: 10));
     } else if (!notifTime.isAfter(now)) {
       return null;
     }
@@ -577,6 +543,7 @@ class NotificationService {
       notifTime.day,
       notifTime.hour,
       notifTime.minute,
+      notifTime.second,
     );
   }
 
@@ -587,36 +554,29 @@ class NotificationService {
       final h = event.startTime!.hour.toString().padLeft(2, '0');
       final m = event.startTime!.minute.toString().padLeft(2, '0');
       final mins = event.notificationMinutesBefore ?? 30;
-      return 'Bắt đầu lúc $h:$m${mins > 0 ? " • còn $mins phút" : ""}';
+      return 'Bắt đầu lúc $h:$m${mins > 0 ? " • Nhắc trước $mins phút" : ""}';
     }
     return 'Nhắc nhở sự kiện trong lịch Việt';
   }
 
-  // ─── Oppo/Realme ColorOS Specific Methods ───────────────────────────────────
+  // ─── Oppo/Realme/Xiaomi Guide ──────────────────────────────────────────────
 
-  /// Lấy hướng dẫn cài đặt cho Oppo/Realme
+  /// Lấy hướng dẫn cài đặt quyền hiển thị nổi và màn hình khóa cho OEM
   String getOppoRealmeGuide() {
     return '''
-📱 Hướng dẫn cho Oppo/Realme (ColorOS):
-🔥 Giống Google Calendar - KHÔNG cần chạy nền!
+📱 Hướng dẫn cấu hình thông báo Màn hình khóa & Banner:
 
-1. Bật thông báo:
-   Cài đặt → Thông báo → Lịch Việt → Bật "Cho phép thông báo"
+1. Bật Thông báo nổi & Màn hình khóa (QUAN TRỌNG NHẤT):
+   Cài đặt → Ứng dụng → Quản lý ứng dụng → Lịch Việt → Thông báo:
+   • Bật "Hiển thị trên màn hình khóa" (Show on Lock screen)
+   • Bật "Thông báo nổi / Banner" (Floating notifications)
+   • Bật "Âm thanh & Rung"
 
-2. Bỏ qua tối ưu pin (QUAN TRỌNG NHẤT):
-   Cài đặt → Pin → Tiết kiệm pin → Lịch Việt → Chọn "Không hạn chế"
-   
-   HOẶC:
-   Cài đặt → Ứng dụng → Lịch Việt → Pin → Bỏ qua tối ưu hóa
-
-3. Bật báo thức (QUAN TRỌNG):
+2. Bật quyền Báo thức & Nhắc nhở:
    Cài đặt → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở → Bật Lịch Việt
-   (Đây là cách Google Calendar hoạt động - không cần app chạy)
 
-💡 TIPS:
-- KHÔNG cần bật "Chạy trong nền" - tốn pin
-- Hệ thống tự thông báo như Google Calendar
-- Đảm bảo quyền Báo thức là QUAN TRỌNG NHẤT
+3. Bỏ qua tối ưu pin:
+   Cài đặt → Pin → Tiết kiệm pin / Tối ưu pin → Lịch Việt → Chọn "Không hạn chế"
 ''';
   }
 }

@@ -334,11 +334,13 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
       ),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
             Row(
               children: [
                 const Text('🔔 Chẩn đoán Thông báo',

@@ -257,7 +257,6 @@ class NotificationService {
           visibility: NotificationVisibility.public, // Hiển thị trên màn hình khóa
           playSound: true,
           enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
           color: event.color,
           styleInformation: BigTextStyleInformation(
             body,
@@ -292,17 +291,32 @@ class NotificationService {
         'id=$notifId -> $tzTime ($mode, Asia/Ho_Chi_Minh)',
       );
 
-      await _plugin.zonedSchedule(
-        notifId,
-        event.title,
-        body,
-        tzTime,
-        details,
-        androidScheduleMode: mode,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: event.id,
-      );
+      try {
+        await _plugin.zonedSchedule(
+          notifId,
+          event.title,
+          body,
+          tzTime,
+          details,
+          androidScheduleMode: mode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: event.id,
+        );
+      } catch (scheduleErr) {
+        debugPrint('[Notif] exact zonedSchedule failed ($scheduleErr), falling back to inexact...');
+        await _plugin.zonedSchedule(
+          notifId,
+          event.title,
+          body,
+          tzTime,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: event.id,
+        );
+      }
 
       final pending = await _plugin.pendingNotificationRequests();
       final found = pending.any((n) => n.id == notifId);
@@ -401,7 +415,6 @@ class NotificationService {
           color: color,
           playSound: true,
           enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
           category: AndroidNotificationCategory.reminder,
         ),
         iOS: const DarwinNotificationDetails(
@@ -439,7 +452,6 @@ class NotificationService {
         visibility: NotificationVisibility.public,
         playSound: true,
         enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
         category: AndroidNotificationCategory.reminder,
         fullScreenIntent: false,
       );
@@ -455,16 +467,30 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      await _plugin.zonedSchedule(
-        888888,
-        '🔔 Lịch Việt – Test thành công!',
-        'Thông báo đã kích hoạt chính xác trên màn hình!',
-        testTime,
-        details,
-        androidScheduleMode: mode,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
+      try {
+        await _plugin.zonedSchedule(
+          888888,
+          '🔔 Lịch Việt – Test thành công!',
+          'Thông báo đã kích hoạt chính xác trên màn hình!',
+          testTime,
+          details,
+          androidScheduleMode: mode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (e1) {
+        debugPrint('[Notif] Test exact schedule failed ($e1), retrying inexact...');
+        await _plugin.zonedSchedule(
+          888888,
+          '🔔 Lịch Việt – Test thành công!',
+          'Thông báo đã kích hoạt chính xác trên màn hình!',
+          testTime,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      }
       
       debugPrint('[Notif] ✅ Test 5s scheduled successfully: mode=$mode time=$testTime');
     } catch (e, stackTrace) {

@@ -151,8 +151,8 @@ class _TodayScreenState extends State<TodayScreen> {
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = 72 + MediaQuery.paddingOf(context).bottom;
 
-    // Tính toán chiều cao cho phần lịch chính
-    final calendarBodyHeight = screenH - topInset - 80 - bottomInset; // 80 là ước tính header + events
+    // Tính toán chiều cao cho phần lịch chính - tăng để lấp đầy nhiều không gian hơn
+    final calendarBodyHeight = screenH - topInset - 120 - bottomInset; // 120 cho header + events + khoảng trống
 
     return Container(
       margin: const EdgeInsets.all(12),
@@ -333,12 +333,12 @@ class _TodayScreenState extends State<TodayScreen> {
     final thuHan = CanChiHelper.thuTrongTuanHan(_now);
 
     return Container(
-      color: const Color(0xFFE8F5E9),  // Indigo 900
+      color: const Color(0xFF0D47A1)  // Blue 900
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Thứ tiếng Việt đơn giản
+          // Thứ tiếng Anh
           Text(
             _thuViet(_now.weekday),
             style: const TextStyle(
@@ -399,6 +399,7 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
       ),
       width: double.infinity,
+      height: double.infinity, // Lấp đầy hết không gian có sẵn
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         child: Row(

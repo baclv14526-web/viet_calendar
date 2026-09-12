@@ -145,10 +145,11 @@ class NotificationService {
       return result;
     }
 
+    final ap = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
     // Android 13+: POST_NOTIFICATIONS
     if (_sdkVersion >= 33) {
-      final ap = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
       result['notification'] =
           await ap?.requestNotificationsPermission() ?? false;
     }
@@ -157,9 +158,6 @@ class NotificationService {
     // Android 33+: this calendar app declares USE_EXACT_ALARM, so the system
     // grants exact-alarm access at install time when the app qualifies.
     if (_sdkVersion >= 31 && _sdkVersion <= 32) {
-      final ap = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-
       var canExact =
           await ap?.canScheduleExactNotifications() ?? false;
 

@@ -8,6 +8,11 @@ import 'dart:io';
 import '../models/calendar_event.dart';
 import '../utils/vietnamese_holidays.dart';
 
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse r) {
+  debugPrint('[Notif] BG tapped: ${r.payload}');
+}
+
 class NotificationService {
   static final NotificationService _instance =
       NotificationService._internal();
@@ -72,7 +77,7 @@ class NotificationService {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onTapped,
-      onDidReceiveBackgroundNotificationResponse: _onBgTapped,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
     await _createChannels();
@@ -116,10 +121,6 @@ class NotificationService {
 
   static void _onTapped(NotificationResponse r) =>
       debugPrint('[Notif] Tapped: ${r.payload}');
-
-  @pragma('vm:entry-point')
-  static void _onBgTapped(NotificationResponse r) =>
-      debugPrint('[Notif] BG tapped: ${r.payload}');
 
   // ─── Permissions ───────────────────────────────────────────────────────────
 

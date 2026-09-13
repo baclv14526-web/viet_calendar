@@ -284,6 +284,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
   };
   List<PendingNotificationRequest> _pending = [];
   bool _loading = true;
+  String? _testMessage;
 
   @override
   void initState() {
@@ -457,9 +458,29 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                 ),
             ]),
 
-            const SizedBox(height: 12),
+            // Thông báo kết quả test inline
+            if (_testMessage != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withOpacity(0.4)),
+                ),
+                child: Text(
+                  _testMessage!,
+                  style: TextStyle(
+                    color: Colors.green[800],
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
 
-            // Test buttons — KHÔNG đóng sheet, hiện kết quả inline
+            // Test buttons — Hiện kết quả inline
             Row(
               children: [
                 Expanded(
@@ -469,13 +490,11 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                     onPressed: () async {
                       await widget.ns.showInstantNotification(
                         title: '🧧 Lịch Việt – Test tức thì',
-                        body: 'Thông báo tức thì hoạt động! ✅',
+                        body: 'Thông báo tức thì hoạt động tốt! ✅',
                       );
-                      if (mounted) {
-                        widget.messenger.showSnackBar(const SnackBar(
-                          content: Text('Đã gửi thông báo tức thì'),
-                        ));
-                      }
+                      setState(() {
+                        _testMessage = '✅ Đã gửi thông báo tức thì!';
+                      });
                     },
                   ),
                 ),
@@ -485,24 +504,13 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                     icon: const Icon(Icons.alarm, size: 16),
                     label: const Text('Test 5 giây', style: TextStyle(fontSize: 12)),
                     onPressed: () async {
+                      setState(() {
+                        _testMessage = '⏱ Đang đếm ngược 5 giây... Thông báo sẽ xuất hiện trên màn hình!';
+                      });
                       try {
                         await widget.ns.scheduleTestIn5Seconds();
                         await _reload();
-                        if (mounted) {
-                          widget.messenger.showSnackBar(const SnackBar(
-                            content: Text(
-                                '⏱ Chờ 5 giây... nếu không thấy → thiếu quyền pin/báo thức!'),
-                            duration: Duration(seconds: 7),
-                          ));
-                        }
                       } catch (e) {
-                        if (mounted) {
-                          widget.messenger.showSnackBar(SnackBar(
-                            content: Text('❌ Lỗi test: $e'),
-                            backgroundColor: Colors.red,
-                            duration: const Duration(seconds: 5),
-                          ));
-                        }
                         debugPrint('[Settings] Test error: $e');
                       }
                     },

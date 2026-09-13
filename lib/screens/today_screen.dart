@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../services/calendar_bloc.dart';
-import '../models/calendar_event.dart';
 import '../utils/lunar_converter.dart';
 import '../utils/can_chi_helper.dart';
-import '../widgets/event_detail_sheet.dart';
 import 'add_event_screen.dart';
 import 'day_view_screen.dart';
 
@@ -49,23 +47,19 @@ class _TodayScreenState extends State<TodayScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8F0), // Nền kem như tờ lịch
-      body: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        padding: EdgeInsets.only(bottom: bottomInset.toDouble()),
-        child: Column(
-          children: [
-            // ── Header tháng dương & âm ──────────────────────────────
-            _buildHeader(context, theme, topInset, lunar, lunarYearName),
+      body: Column(
+        children: [
+          // ── Header tháng dương & âm ──────────────────────────────
+          _buildHeader(context, theme, topInset, lunar, lunarYearName),
 
-            // ── Thân tờ lịch ─────────────────────────────────────────
-            _buildCalendarBody(context, theme, lunar, hoangDao, isHD),
-
-            // ── Sự kiện hôm nay ──────────────────────────────────────
-            _buildTodayEvents(context, theme),
-
-            const SizedBox(height: 8),
-          ],
-        ),
+          // ── Thân tờ lịch co giãn tự động sát mép menu ────────────
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(10, 6, 10, bottomInset + 4),
+              child: _buildCalendarBody(context, theme, lunar, hoangDao, isHD),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: bottomInset - 64),
@@ -147,19 +141,11 @@ class _TodayScreenState extends State<TodayScreen> {
     bool isHD,
   ) {
     final screenW = MediaQuery.sizeOf(context).width;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final topInset = MediaQuery.paddingOf(context).top;
-    final bottomInset = 72 + MediaQuery.paddingOf(context).bottom;
-
-    // Tính toán chiều cao cho phần lịch chính - tăng để lấp đầy nhiều không gian hơn
-    final calendarBodyHeight = screenH - topInset - 120 - bottomInset; // 120 cho header + events + khoảng trống
 
     return Container(
-      margin: const EdgeInsets.all(12),
-      height: calendarBodyHeight,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -168,6 +154,7 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           // ── Hoàng đạo / Hắc đạo badge + Ngày/Tuần trong năm ──────
@@ -177,11 +164,11 @@ class _TodayScreenState extends State<TodayScreen> {
           GestureDetector(
             onTap: () => _openDayView(context),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
                 '${_now.day}',
                 style: TextStyle(
-                  fontSize: screenW * 0.38,
+                  fontSize: screenW * 0.36,
                   fontWeight: FontWeight.w900,
                   color: _dayNumberColor(),
                   height: 1.0,
@@ -193,18 +180,22 @@ class _TodayScreenState extends State<TodayScreen> {
 
           // ── Câu danh ngôn ─────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               CanChiHelper.quoteOfDay(_now),
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11.5,
                 color: Colors.grey[600],
                 fontStyle: FontStyle.italic,
-                height: 1.4,
+                height: 1.3,
               ),
             ),
           ),
+
+          const SizedBox(height: 4),
 
           // ── Giờ hoàng đạo ─────────────────────────────────────────
           _buildHoangDaoRow(theme, hoangDao),
@@ -216,7 +207,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
           const Divider(height: 1, thickness: 0.5),
 
-          // ── Can Chi + Âm lịch ─────────────────────────────────────
+          // ── Can Chi + Âm lịch (Co giãn tự động lấp đầy nền vàng) ──
           Expanded(
             child: _buildBottomInfo(context, theme, lunar),
           ),
@@ -228,7 +219,7 @@ class _TodayScreenState extends State<TodayScreen> {
   // Badge hoàng đạo / hắc đạo
   Widget _buildTopBadge(ThemeData theme, bool isHD) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -279,7 +270,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final currentChi = CanChiHelper.diaChi[
         (((_now.hour + 1) ~/ 2)) % 12];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
       child: Column(
         children: [
           Text(
@@ -290,7 +281,7 @@ class _TodayScreenState extends State<TodayScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: hoangDao.map((chi) {
@@ -298,7 +289,7 @@ class _TodayScreenState extends State<TodayScreen> {
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: isCurrent
                       ? const Color(0xFFFFAB00)
@@ -314,7 +305,7 @@ class _TodayScreenState extends State<TodayScreen> {
                 child: Text(
                   chi,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.bold,
                     color: isCurrent ? Colors.white : const Color(0xFF795548),
                   ),
@@ -334,7 +325,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
     return Container(
       color: const Color(0xFF0D47A1),  // Blue 900
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -379,7 +370,7 @@ class _TodayScreenState extends State<TodayScreen> {
     return map[weekday] ?? '';
   }
 
-  // Phần dưới: Can Chi (trái) + Âm lịch (giữa) + Hán tự (phải)
+  // Phần dưới: Can Chi (trái) + Âm lịch (giữa) + Hán tự (phải) co giãn lấp đầy nền vàng
   Widget _buildBottomInfo(BuildContext context, ThemeData theme, dynamic lunar) {
     final ngayCC = CanChiHelper.ngayCanChi(_now);
     final thangCC = CanChiHelper.thangCanChi(lunar.month, lunar.year);
@@ -394,20 +385,20 @@ class _TodayScreenState extends State<TodayScreen> {
       decoration: const BoxDecoration(
         color: Color(0xFFFFF3E0),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
         ),
       ),
       width: double.infinity,
-      height: double.infinity, // Lấp đầy hết không gian có sẵn
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ── Cột trái: Can Chi ──────────────────────────────────
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _canChiItem('Giờ $gioCC'),
@@ -421,6 +412,7 @@ class _TodayScreenState extends State<TodayScreen> {
             // ── Cột giữa: Âm lịch lớn ─────────────────────────────
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'Tháng ${lunar.month}${lunar.isLeapMonth ? " nhuận" : ""}',
@@ -430,11 +422,11 @@ class _TodayScreenState extends State<TodayScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     '${lunar.day}',
                     style: TextStyle(
-                      fontSize: 52,
+                      fontSize: 54,
                       fontWeight: FontWeight.w900,
                       color: Colors.brown[700],
                       height: 1.0,
@@ -447,13 +439,14 @@ class _TodayScreenState extends State<TodayScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        color: theme.colorScheme.primary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         'Xem chi tiết',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
                           color: theme.colorScheme.primary,
                         ),
                       ),
@@ -466,6 +459,7 @@ class _TodayScreenState extends State<TodayScreen> {
             // ── Cột phải: Hán tự ──────────────────────────────────
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _hanItem(namHan),
@@ -478,6 +472,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF5D4037),
                       fontFamily: 'serif',
+                      height: 1.1,
                     ),
                   ),
                   _hanItem(CanChiHelper.ngayCanChi(_now)),
@@ -507,122 +502,6 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         textAlign: TextAlign.right,
       );
-
-  // ─── Sự kiện hôm nay ────────────────────────────────────────────────────────
-
-  Widget _buildTodayEvents(BuildContext context, ThemeData theme) {
-    return BlocBuilder<CalendarBloc, CalendarState>(
-      buildWhen: (p, c) => p.events != c.events,
-      builder: (context, state) {
-        final key = DateTime(_now.year, _now.month, _now.day);
-        final events = state.events[key] ?? [];
-
-        if (events.isEmpty) return const SizedBox.shrink();
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.event, size: 16,
-                        color: theme.colorScheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Sự kiện hôm nay (${events.length})',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ...events.map((e) => _eventTile(context, e)),
-              const SizedBox(height: 4),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _eventTile(BuildContext context, CalendarEvent event) {
-    final isHoliday = event.type == EventType.holiday ||
-        event.type == EventType.lunarHoliday;
-
-    return InkWell(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => EventDetailSheet(event: event),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: Row(
-          children: [
-            Container(
-              width: 3,
-              height: 36,
-              decoration: BoxDecoration(
-                color: event.color,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                  if (!event.isAllDay && event.startTime != null)
-                    Text(
-                      event.startTime!.format(context),
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey[500]),
-                    )
-                  else
-                    Text(
-                      isHoliday ? 'Ngày lễ' : 'Cả ngày',
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey[500]),
-                    ),
-                ],
-              ),
-            ),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: event.color,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 

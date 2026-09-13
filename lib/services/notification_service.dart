@@ -468,7 +468,7 @@ class NotificationService {
         interruptionLevel: InterruptionLevel.timeSensitive,
       );
 
-      final details = NotificationDetails(
+      const details = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );

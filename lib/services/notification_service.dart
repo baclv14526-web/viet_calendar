@@ -5,7 +5,6 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
-import 'dart:typed_data';
 import '../models/calendar_event.dart';
 import '../utils/vietnamese_holidays.dart';
 
@@ -450,7 +449,7 @@ class NotificationService {
       );
       debugPrint('[Notif] Test time: $testTime');
 
-      final androidDetails = AndroidNotificationDetails(
+      const androidDetails = AndroidNotificationDetails(
         _eventChannelId,
         'Sự kiện lịch',
         channelDescription: 'Test thông báo',

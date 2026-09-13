@@ -323,7 +323,6 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isOppoRealme = widget.ns.isOppoOrRealme;
     final allOk = _perms.values.every((v) => v);
 
     return Container(
@@ -501,7 +500,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
                           widget.messenger.showSnackBar(SnackBar(
                             content: Text('❌ Lỗi test: $e'),
                             backgroundColor: Colors.red,
-                            duration: Duration(seconds: 5),
+                            duration: const Duration(seconds: 5),
                           ));
                         }
                         debugPrint('[Settings] Test error: $e');

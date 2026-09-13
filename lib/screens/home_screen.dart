@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/calendar_bloc.dart';
+import '../services/notification_service.dart';
 import 'today_screen.dart';
 import 'calendar_screen.dart';
 import 'agenda_screen.dart';
@@ -30,8 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     context.read<CalendarBloc>().add(LoadCalendarEvents(DateTime.now()));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final ns = context.read<NotificationService>();
-      await ns.requestAllPermissions();
+      await NotificationService().requestAllPermissions();
     });
   }
 

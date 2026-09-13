@@ -55,7 +55,7 @@ class _TodayScreenState extends State<TodayScreen> {
           // ── Thân tờ lịch co giãn tự động sát mép menu ────────────
           Expanded(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(10, 6, 10, bottomInset + 4),
+              padding: EdgeInsets.fromLTRB(8, 4, 8, bottomInset),
               child: _buildCalendarBody(context, theme, lunar, hoangDao, isHD),
             ),
           ),
@@ -391,14 +391,14 @@ class _TodayScreenState extends State<TodayScreen> {
       ),
       width: double.infinity,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // ── Cột trái: Can Chi ──────────────────────────────────
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _canChiItem('Giờ $gioCC'),
@@ -412,32 +412,30 @@ class _TodayScreenState extends State<TodayScreen> {
             // ── Cột giữa: Âm lịch lớn ─────────────────────────────
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Text(
                     'Tháng ${lunar.month}${lunar.isLeapMonth ? " nhuận" : ""}',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       color: Colors.brown[600],
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 2),
                   Text(
                     '${lunar.day}',
                     style: TextStyle(
-                      fontSize: 54,
+                      fontSize: 56,
                       fontWeight: FontWeight.w900,
                       color: Colors.brown[700],
                       height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   GestureDetector(
                     onTap: () => _openDayView(context),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
+                          horizontal: 10, vertical: 3.5),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
@@ -459,16 +457,15 @@ class _TodayScreenState extends State<TodayScreen> {
             // ── Cột phải: Hán tự ──────────────────────────────────
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _hanItem(namHan),
                   _hanItem(thangHan),
-                  const SizedBox(height: 4),
                   Text(
                     ngayHan,
                     style: const TextStyle(
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF5D4037),
                       fontFamily: 'serif',

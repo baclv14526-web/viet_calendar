@@ -29,6 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     context.read<CalendarBloc>().add(LoadCalendarEvents(DateTime.now()));
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final ns = context.read<NotificationService>();
+      await ns.requestAllPermissions();
+    });
   }
 
   @override

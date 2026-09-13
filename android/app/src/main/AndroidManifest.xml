@@ -13,12 +13,10 @@
     <!-- Android 13+ (API 33): show notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Android 12+ (API 31): exact alarms -->
-    <!-- SCHEDULE_EXACT_ALARM: user must grant in Settings > Special app access -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        android:maxSdkVersion="32"/>
-
-    <!-- Android 13+ (API 33): exact alarms - auto granted for calendar apps -->
+    <!-- Android 12+ (API 31+): exact alarms -->
+    <!-- SCHEDULE_EXACT_ALARM: required for Android 12, 13, 14 special app access -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- Android 13+ (API 33): exact alarms auto-granted for calendar apps -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
 
     <application
@@ -67,6 +65,14 @@
         -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+
+        <!--
+            ActionBroadcastReceiver:
+            Handles notification action buttons.
+        -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false"/>
 
         <meta-data android:name="flutterEmbedding" android:value="2"/>

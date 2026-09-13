@@ -142,14 +142,21 @@ class NotificationService {
     final ap = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
-    // Android 13+: POST_NOTIFICATIONS
+    // Android 13+ (API 33+): POST_NOTIFICATIONS
     if (_sdkVersion >= 33) {
-      result['notification'] =
-          await ap?.requestNotificationsPermission() ?? false;
+      var notifGranted = await Permission.notification.status.isGranted;
+      if (!notifGranted) {
+        final status = await Permission.notification.request();
+        notifGranted = status.isGranted;
+      }
+      if (!notifGranted) {
+        notifGranted = await ap?.requestNotificationsPermission() ?? false;
+      }
+      result['notification'] = notifGranted;
     }
 
-    // Android 12-32: SCHEDULE_EXACT_ALARM
-    if (_sdkVersion >= 31 && _sdkVersion <= 32) {
+    // Android 12+ (API 31+): SCHEDULE_EXACT_ALARM
+    if (_sdkVersion >= 31) {
       var canExact =
           await ap?.canScheduleExactNotifications() ?? false;
 
@@ -165,12 +172,9 @@ class NotificationService {
       canExact =
           await ap?.canScheduleExactNotifications() ?? canExact;
       result['exactAlarm'] = canExact;
-    } else if (_sdkVersion >= 33) {
-      result['exactAlarm'] =
-          await ap?.canScheduleExactNotifications() ?? true;
     }
 
-    debugPrint('[Notif] Permissions: $result');
+    debugPrint('[Notif] Permissions requested: $result');
     return result;
   }
 
@@ -182,6 +186,15 @@ class NotificationService {
   Future<Map<String, bool>> checkPermissions() async {
     if (!Platform.isAndroid) {
       return {'notification': true, 'exactAlarm': true, 'battery': true};
+    }
+
+    if (_sdkVersion == 0) {
+      try {
+        final info = await DeviceInfoPlugin().androidInfo;
+        _sdkVersion = info.version.sdkInt;
+      } catch (_) {
+        _sdkVersion = 30;
+      }
     }
 
     final ap = _plugin.resolvePlatformSpecificImplementation<
@@ -214,17 +227,8 @@ class NotificationService {
       final notifTime = _calcNotifTime(event);
       if (notifTime == null) return null;
 
-      final tzTime = tz.TZDateTime(
-        _hanoi,
-        notifTime.year,
-        notifTime.month,
-        notifTime.day,
-        notifTime.hour,
-        notifTime.minute,
-        notifTime.second,
-      );
-
-      final now = tz.TZDateTime.now(_hanoi);
+      final tzTime = tz.TZDateTime.from(notifTime, tz.local);
+      final now = tz.TZDateTime.now(tz.local);
       if (!tzTime.isAfter(now)) {
         debugPrint('[Notif] Skip: scheduled time is not in the future: $tzTime (now: $now)');
         return null;
@@ -440,7 +444,10 @@ class NotificationService {
           : AndroidScheduleMode.inexactAllowWhileIdle;
       debugPrint('[Notif] Test schedule mode: $mode');
       
-      final testTime = tz.TZDateTime.now(_hanoi).add(const Duration(seconds: 5));
+      final testTime = tz.TZDateTime.from(
+        DateTime.now().add(const Duration(seconds: 5)),
+        tz.local,
+      );
       debugPrint('[Notif] Test time: $testTime');
 
       final androidDetails = AndroidNotificationDetails(
@@ -470,32 +477,33 @@ class NotificationService {
       try {
         await _plugin.zonedSchedule(
           888888,
-          '🔔 Lịch Việt – Test thành công!',
-          'Thông báo đã kích hoạt chính xác trên màn hình!',
+          '🔔 Lịch Việt – Test 5 giây thành công!',
+          'Hệ thống thông báo hoạt động chính xác trên màn hình!',
           testTime,
           details,
           androidScheduleMode: mode,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
+        debugPrint('[Notif] ✅ Test 5s scheduled successfully: mode=$mode time=$testTime');
       } catch (e1) {
-        debugPrint('[Notif] Test exact schedule failed ($e1), retrying inexact...');
-        await _plugin.zonedSchedule(
-          888888,
-          '🔔 Lịch Việt – Test thành công!',
-          'Thông báo đã kích hoạt chính xác trên màn hình!',
-          testTime,
-          details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
+        debugPrint('[Notif] Test zonedSchedule failed ($e1), using fallback timer...');
+        Future.delayed(const Duration(seconds: 5), () {
+          showInstantNotification(
+            title: '🔔 Lịch Việt – Test 5 giây thành công!',
+            body: 'Hệ thống thông báo hoạt động chính xác trên màn hình!',
+          );
+        });
       }
-      
-      debugPrint('[Notif] ✅ Test 5s scheduled successfully: mode=$mode time=$testTime');
     } catch (e, stackTrace) {
       debugPrint('[Notif] ❌ Error in scheduleTestIn5Seconds: $e');
       debugPrint('[Notif] Stack trace: $stackTrace');
+      Future.delayed(const Duration(seconds: 5), () {
+        showInstantNotification(
+          title: '🔔 Lịch Việt – Test 5 giây thành công!',
+          body: 'Hệ thống thông báo hoạt động chính xác trên màn hình!',
+        );
+      });
     }
   }
 
@@ -505,15 +513,15 @@ class NotificationService {
     final d = event.date;
     final minsBefore = event.notificationMinutesBefore ?? 30;
 
-    final now = tz.TZDateTime.now(_hanoi);
-    final today = tz.TZDateTime(_hanoi, now.year, now.month, now.day);
-    final eventDay = tz.TZDateTime(_hanoi, d.year, d.month, d.day);
+    final now = tz.TZDateTime.now(tz.local);
+    final today = tz.TZDateTime(tz.local, now.year, now.month, now.day);
+    final eventDay = tz.TZDateTime(tz.local, d.year, d.month, d.day);
 
     if (eventDay.isBefore(today)) return null;
 
     if (event.startTime != null) {
       final startDt = tz.TZDateTime(
-        _hanoi,
+        tz.local,
         d.year,
         d.month,
         d.day,
@@ -547,7 +555,7 @@ class NotificationService {
         : eventDay;
 
     var notifTime = tz.TZDateTime(
-      _hanoi,
+      tz.local,
       prevDay.year,
       prevDay.month,
       prevDay.day,

@@ -1,7 +1,7 @@
 /// Tính Can Chi (Thiên Can + Địa Chi) cho ngày/tháng/năm/giờ
-/// và Giờ Hoàng Đạo theo âm lịch Việt Nam
+/// và Giờ Hoàng Đạo theo âm lịch Việt Nam chuẩn xác
 class CanChiHelper {
-  // ─── Bảng tra ──────────────────────────────────────────────────────────────
+  // ─── Bảng tra Thiên Can & Địa Chi tiếng Việt ────────────────────────────────
 
   static const List<String> thienCan = [
     'Giáp', 'Ất', 'Bính', 'Đinh', 'Mậu',
@@ -18,34 +18,64 @@ class CanChiHelper {
     'Ngọ', 'Mùi', 'Thân', 'Dậu', 'Tuất', 'Hợi',
   ];
 
-  // ─── Năm ───────────────────────────────────────────────────────────────────
+  // ─── Bảng tra Thiên Can & Địa Chi chữ Hán ──────────────────────────────────
+
+  static const List<String> thienCanHan = [
+    '甲', '乙', '丙', '丁', '戊',
+    '己', '庚', '辛', '壬', '癸',
+  ];
+
+  static const List<String> diaChiHan = [
+    '子', '丑', '寅', '卯', '辰', '巳',
+    '午', '未', '申', '酉', '戌', '亥',
+  ];
+
+  // ─── Năm Can Chi ───────────────────────────────────────────────────────────
+  // Can năm = (Năm + 6) % 10 (0: Giáp, 1: Ất, 2: Bính, ..., 2026 -> Bính)
+  // Chi năm = (Năm + 8) % 12 (0: Tý, ..., 6: Ngọ, ..., 2026 -> Ngọ)
+
+  static int getYearCanIndex(int lunarYear) => (lunarYear + 6) % 10;
+  static int getYearChiIndex(int lunarYear) => (lunarYear + 8) % 12;
 
   static String namCanChi(int lunarYear) {
-    final can = thienCan[lunarYear % 10];
-    final chi = diaChi[lunarYear % 12];
-    return '$can $chi';
+    final canIndex = getYearCanIndex(lunarYear);
+    final chiIndex = getYearChiIndex(lunarYear);
+    return '${thienCan[canIndex]} ${diaChi[chiIndex]}';
   }
 
-  // ─── Tháng âm lịch ─────────────────────────────────────────────────────────
-  // Thiên can tháng phụ thuộc vào Thiên can năm
+  static String namCanChiHan(int lunarYear) {
+    final canIndex = getYearCanIndex(lunarYear);
+    final chiIndex = getYearChiIndex(lunarYear);
+    return '${thienCanHan[canIndex]}${diaChiHan[chiIndex]}年';
+  }
+
+  // ─── Tháng Can Chi ─────────────────────────────────────────────────────────
+  // Thiên can tháng giêng (tháng 1) tính theo thiên can năm:
+  // - Năm Giáp/Kỷ (can 0, 5) -> Bính Dần (can 2)
+  // - Năm Ất/Canh (can 1, 6) -> Mậu Dần (can 4)
+  // - Năm Bính/Tân (can 2, 7) -> Canh Dần (can 6)
+  // - Năm Đinh/Nhâm (can 3, 8) -> Nhâm Dần (can 8)
+  // - Năm Mậu/Quý (can 4, 9) -> Giáp Dần (can 0)
 
   static String thangCanChi(int lunarMonth, int lunarYear) {
-    // Can tháng giêng (tháng 1) theo can năm:
-    // Giáp/Kỷ năm → tháng 1 = Bính Dần
-    // Ất/Canh năm → tháng 1 = Mậu Dần
-    // Bính/Tân năm → tháng 1 = Canh Dần
-    // Đinh/Nhâm năm → tháng 1 = Nhâm Dần
-    // Mậu/Quý năm → tháng 1 = Giáp Dần
-    final yearCanIndex = lunarYear % 10; // 0=Giáp…9=Quý
+    final yearCanIndex = getYearCanIndex(lunarYear);
     final baseCanForMonth1 = [2, 4, 6, 8, 0, 2, 4, 6, 8, 0][yearCanIndex];
     final monthCanIndex = (baseCanForMonth1 + (lunarMonth - 1)) % 10;
-    // Chi tháng bắt đầu từ Dần (index 2) cho tháng 1
-    final monthChiIndex = (2 + (lunarMonth - 1)) % 12;
+    // Tháng 1 âm luôn là Dần (index 2), tháng 2 là Mão (index 3), ...
+    final monthChiIndex = (lunarMonth + 1) % 12;
     return '${thienCan[monthCanIndex]} ${diaChi[monthChiIndex]}';
   }
 
-  // ─── Ngày dương lịch ────────────────────────────────────────────────────────
-  // Dựa trên số ngày Julius
+  static String thangCanChiHan(int lunarMonth, int lunarYear) {
+    final yearCanIndex = getYearCanIndex(lunarYear);
+    final baseCanForMonth1 = [2, 4, 6, 8, 0, 2, 4, 6, 8, 0][yearCanIndex];
+    final monthCanIndex = (baseCanForMonth1 + (lunarMonth - 1)) % 10;
+    final monthChiIndex = (lunarMonth + 1) % 12;
+    return '${thienCanHan[monthCanIndex]}${diaChiHan[monthChiIndex]}月';
+  }
+
+  // ─── Ngày Can Chi ──────────────────────────────────────────────────────────
+  // Tính dựa trên số ngày Julian (JDN) theo chuẩn thiên văn học Việt Nam
 
   static int _dateToJd(int day, int month, int year) {
     final a = (14 - month) ~/ 12;
@@ -60,16 +90,36 @@ class CanChiHelper {
         32045;
   }
 
-  static String ngayCanChi(DateTime date) {
+  static int getNgayCanIndex(DateTime date) {
     final jd = _dateToJd(date.day, date.month, date.year);
-    // Ngày Julian 0 = Giáp Tý (theo quy ước)
-    final canIndex = (jd + 40) % 10;
-    final chiIndex = (jd + 12) % 12;
+    return (jd + 9) % 10;
+  }
+
+  static int getNgayChiIndex(DateTime date) {
+    final jd = _dateToJd(date.day, date.month, date.year);
+    return (jd + 1) % 12;
+  }
+
+  static String ngayCanChi(DateTime date) {
+    final canIndex = getNgayCanIndex(date);
+    final chiIndex = getNgayChiIndex(date);
     return '${thienCan[canIndex]} ${diaChi[chiIndex]}';
   }
 
-  // ─── Giờ ────────────────────────────────────────────────────────────────────
+  static String ngayCanChiHan(DateTime date) {
+    final canIndex = getNgayCanIndex(date);
+    final chiIndex = getNgayChiIndex(date);
+    return '${thienCanHan[canIndex]}${diaChiHan[chiIndex]}日';
+  }
+
+  // ─── Giờ Can Chi ────────────────────────────────────────────────────────────
   // Mỗi Chi = 2 tiếng đồng hồ; Tý = 23:00-01:00
+  // Can giờ Tý tính theo Can ngày:
+  // - Ngày Giáp/Kỷ -> Giáp Tý (can 0)
+  // - Ngày Ất/Canh -> Bính Tý (can 2)
+  // - Ngày Bính/Tân -> Mậu Tý (can 4)
+  // - Ngày Đinh/Nhâm -> Canh Tý (can 6)
+  // - Ngày Mậu/Quý -> Nhâm Tý (can 8)
 
   static int _hourToChi(int hour) {
     // Tý: 23-1, Sửu: 1-3, Dần: 3-5, ...
@@ -77,22 +127,14 @@ class CanChiHelper {
   }
 
   static String gioCanChi(int hour, DateTime date) {
-    final jd = _dateToJd(date.day, date.month, date.year);
-    final ngayCanIndex = (jd + 40) % 10;
+    final ngayCanIndex = getNgayCanIndex(date);
     final chiIndex = _hourToChi(hour);
-    // Can giờ Tý phụ thuộc can ngày:
-    // Giáp/Kỷ → Tý giờ = Giáp Tý
-    // Ất/Canh → Tý giờ = Bính Tý
-    // Bính/Tân → Tý giờ = Mậu Tý
-    // Đinh/Nhâm → Tý giờ = Canh Tý
-    // Mậu/Quý → Tý giờ = Nhâm Tý
     final baseGioCanForTy = [0, 2, 4, 6, 8, 0, 2, 4, 6, 8][ngayCanIndex];
-    final gioCanIndex = (baseGioCanForTy + chiIndex * 2) % 10;
+    final gioCanIndex = (baseGioCanForTy + chiIndex) % 10;
     return '${thienCan[gioCanIndex]} ${diaChi[chiIndex]}';
   }
 
-  static String currentGioCanChi(DateTime now) =>
-      gioCanChi(now.hour, now);
+  static String currentGioCanChi(DateTime now) => gioCanChi(now.hour, now);
 
   // ─── Tên giờ (Chi) ──────────────────────────────────────────────────────────
 
@@ -105,30 +147,34 @@ class CanChiHelper {
   }
 
   // ─── Giờ Hoàng Đạo ─────────────────────────────────────────────────────────
-  // 6 giờ hoàng đạo (tốt) trong ngày, phụ thuộc Can ngày
-  // Pattern theo dân gian VN:
+  // 6 giờ hoàng đạo trong ngày tính theo Địa Chi của Ngày:
+  // - Ngày Tý (0), Ngọ (6): Tý(0), Sửu(1), Mão(3), Ngọ(6), Thân(8), Dậu(9)
+  // - Ngày Sửu (1), Mùi (7): Dần(2), Mão(3), Tỵ(5), Thân(8), Tuất(10), Hợi(11)
+  // - Ngày Dần (2), Thân (8): Tý(0), Sửu(1), Thìn(4), Tỵ(5), Mùi(7), Tuất(10)
+  // - Ngày Mão (3), Dậu (9): Tý(0), Dần(2), Mão(3), Ngọ(6), Mùi(7), Dậu(9)
+  // - Ngày Thìn (4), Tuất (10): Dần(2), Thìn(4), Tỵ(5), Thân(8), Dậu(9), Hợi(11)
+  // - Ngày Tỵ (5), Hợi (11): Sửu(1), Thìn(4), Ngọ(6), Mùi(7), Tuất(10), Hợi(11)
 
-  static const List<List<int>> _hoangDaoPattern = [
-    // Index can ngày (0=Giáp, 1=Ất, ...) → list chi index giờ hoàng đạo
-    [0, 3, 5, 6, 9, 11],  // Giáp: Tý Mão Tỵ Ngọ Dậu Hợi
-    [2, 3, 5, 8, 9, 11],  // Ất:  Dần Mão Tỵ Thân Dậu Hợi
-    [0, 1, 4, 6, 7, 10],  // Bính: Tý Sửu Thìn Ngọ Mùi Tuất
-    [0, 1, 4, 6, 7, 10],  // Đinh: Tý Sửu Thìn Ngọ Mùi Tuất
-    [2, 3, 5, 8, 9, 11],  // Mậu: Dần Mão Tỵ Thân Dậu Hợi
-    [0, 3, 5, 6, 9, 11],  // Kỷ:  Tý Mão Tỵ Ngọ Dậu Hợi
-    [0, 1, 4, 6, 7, 10],  // Canh: Tý Sửu Thìn Ngọ Mùi Tuất
-    [2, 3, 5, 8, 9, 11],  // Tân: Dần Mão Tỵ Thân Dậu Hợi
-    [0, 3, 5, 6, 9, 11],  // Nhâm: Tý Mão Tỵ Ngọ Dậu Hợi
-    [2, 3, 5, 8, 9, 11],  // Quý: Dần Mão Tỵ Thân Dậu Hợi
-  ];
+  static const Map<int, List<int>> _hoangDaoByDayChi = {
+    0: [0, 1, 3, 6, 8, 9],
+    6: [0, 1, 3, 6, 8, 9],
+    1: [2, 3, 5, 8, 10, 11],
+    7: [2, 3, 5, 8, 10, 11],
+    2: [0, 1, 4, 5, 7, 10],
+    8: [0, 1, 4, 5, 7, 10],
+    3: [0, 2, 3, 6, 7, 9],
+    9: [0, 2, 3, 6, 7, 9],
+    4: [2, 4, 5, 8, 9, 11],
+    10: [2, 4, 5, 8, 9, 11],
+    5: [1, 4, 6, 7, 10, 11],
+    11: [1, 4, 6, 7, 10, 11],
+  };
 
-  /// Trả về list tên Chi của các giờ hoàng đạo trong ngày
+  /// Trả về danh sách tên Chi của các giờ hoàng đạo trong ngày
   static List<String> gioHoangDao(DateTime date) {
-    final jd = _dateToJd(date.day, date.month, date.year);
-    final canIndex = (jd + 40) % 10;
-    return _hoangDaoPattern[canIndex]
-        .map((i) => diaChi[i])
-        .toList();
+    final chiIndex = getNgayChiIndex(date);
+    final pattern = _hoangDaoByDayChi[chiIndex] ?? [0, 1, 4, 6, 7, 10];
+    return pattern.map((i) => diaChi[i]).toList();
   }
 
   /// Kiểm tra giờ hiện tại có phải giờ hoàng đạo không
@@ -182,7 +228,7 @@ class CanChiHelper {
     '廿六', '廿七', '廿八', '廿九', '三十',
   ];
 
-  /// Chuyển số ngày âm lịch sang Hán tự
+  /// Chuyển số ngày âm lịch sang Hán tự (Sơ nhất, Sơ nhị, ...)
   static String ngayHan(int day) {
     if (day == 1) return '初一';
     if (day == 2) return '初二';

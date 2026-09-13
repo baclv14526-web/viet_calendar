@@ -377,9 +377,9 @@ class _TodayScreenState extends State<TodayScreen> {
     final namCC = CanChiHelper.namCanChi(lunar.year);
     final gioCC = CanChiHelper.currentGioCanChi(_now);
     final ngayHan = CanChiHelper.ngayHan(lunar.day);
-    final namHan =
-        '${CanChiHelper.thienCan[lunar.year % 10]}${CanChiHelper.diaChi[lunar.year % 12]}年';
+    final namHan = CanChiHelper.namCanChiHan(lunar.year);
     final thangHan = CanChiHelper.thangHanSimple[lunar.month - 1];
+    final ngayCCHan = CanChiHelper.ngayCanChiHan(_now);
 
     return Container(
       decoration: const BoxDecoration(
@@ -475,7 +475,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       height: 1.1,
                     ),
                   ),
-                  _hanItem(CanChiHelper.ngayCanChi(_now)),
+                  _hanItem(ngayCCHan),
                 ],
               ),
             ),

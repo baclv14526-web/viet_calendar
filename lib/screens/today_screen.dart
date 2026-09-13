@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../models/calendar_event.dart';
 import '../services/calendar_bloc.dart';
 import '../utils/lunar_converter.dart';
 import '../utils/can_chi_helper.dart';
+import '../widgets/event_detail_sheet.dart';
 import 'add_event_screen.dart';
 import 'day_view_screen.dart';
 
@@ -47,19 +49,54 @@ class _TodayScreenState extends State<TodayScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8F0), // Nền kem như tờ lịch
-      body: Column(
-        children: [
-          // ── Header tháng dương & âm ──────────────────────────────
-          _buildHeader(context, theme, topInset, lunar, lunarYearName),
+      body: BlocBuilder<CalendarBloc, CalendarState>(
+        buildWhen: (p, c) => p.events != c.events,
+        builder: (context, state) {
+          final key = DateTime(_now.year, _now.month, _now.day);
+          final events = state.events[key] ?? [];
 
-          // ── Thân tờ lịch co giãn tự động sát mép menu ────────────
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(8, 4, 8, bottomInset),
-              child: _buildCalendarBody(context, theme, lunar, hoangDao, isHD),
+          if (events.isEmpty) {
+            return Column(
+              children: [
+                // ── Header tháng dương & âm ──────────────────────────────
+                _buildHeader(context, theme, topInset, lunar, lunarYearName),
+
+                // ── Thân tờ lịch co giãn tự động sát mép menu ────────────
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(8, 4, 8, bottomInset),
+                    child: _buildCalendarBody(
+                        context, theme, lunar, hoangDao, isHD, events),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          // Khi có sự kiện hôm nay: cuộn mượt mà và hiển thị danh sách sự kiện
+          final screenH = MediaQuery.sizeOf(context).height;
+          final calendarCardH = (screenH - topInset - bottomInset - 80)
+              .clamp(380.0, 520.0);
+
+          return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            padding: EdgeInsets.only(bottom: bottomInset + 8),
+            child: Column(
+              children: [
+                _buildHeader(context, theme, topInset, lunar, lunarYearName),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: SizedBox(
+                    height: calendarCardH,
+                    child: _buildCalendarBody(
+                        context, theme, lunar, hoangDao, isHD, events),
+                  ),
+                ),
+                _buildTodayEvents(context, theme, events),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: bottomInset - 64),
@@ -139,6 +176,7 @@ class _TodayScreenState extends State<TodayScreen> {
     dynamic lunar,
     List<String> hoangDao,
     bool isHD,
+    List<CalendarEvent> events,
   ) {
     final screenW = MediaQuery.sizeOf(context).width;
 
@@ -158,7 +196,7 @@ class _TodayScreenState extends State<TodayScreen> {
       child: Column(
         children: [
           // ── Hoàng đạo / Hắc đạo badge + Ngày/Tuần trong năm ──────
-          _buildTopBadge(theme, isHD),
+          _buildTopBadge(theme, isHD, events.length),
 
           // ── Số ngày lớn (dương lịch) ──────────────────────────────
           GestureDetector(
@@ -216,8 +254,8 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
-  // Badge hoàng đạo / hắc đạo
-  Widget _buildTopBadge(ThemeData theme, bool isHD) {
+  // Badge hoàng đạo / hắc đạo + Sự kiện hôm nay
+  Widget _buildTopBadge(ThemeData theme, bool isHD, int eventCount) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
@@ -242,6 +280,32 @@ class _TodayScreenState extends State<TodayScreen> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
+              if (eventCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_note,
+                          size: 11, color: theme.colorScheme.primary),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$eventCount sự kiện',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
           // Ngày / Tuần
@@ -499,6 +563,124 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         textAlign: TextAlign.right,
       );
+
+  // ─── Sự kiện hôm nay ────────────────────────────────────────────────────────
+
+  Widget _buildTodayEvents(
+    BuildContext context,
+    ThemeData theme,
+    List<CalendarEvent> events,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Row(
+              children: [
+                Icon(Icons.event, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Sự kiện hôm nay (${events.length})',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 0.5),
+          ...events.map((e) => _eventTile(context, e)),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  Widget _eventTile(BuildContext context, CalendarEvent event) {
+    final isHoliday = event.type == EventType.holiday ||
+        event.type == EventType.lunarHoliday;
+
+    return InkWell(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => EventDetailSheet(event: event),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 36,
+              decoration: BoxDecoration(
+                color: event.color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.title,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  if (!event.isAllDay && event.startTime != null)
+                    Text(
+                      event.startTime!.format(context),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey[600],
+                      ),
+                    )
+                  else
+                    Text(
+                      isHoliday ? 'Ngày lễ' : 'Cả ngày',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: event.color,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 

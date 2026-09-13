@@ -125,6 +125,7 @@ class NotificationService {
   // ─── Permissions ───────────────────────────────────────────────────────────
 
   Future<Map<String, bool>> requestAllPermissions() async {
+    await initialize();
     final result = <String, bool>{
       'notification': true,
       'exactAlarm': true,
@@ -144,7 +145,7 @@ class NotificationService {
 
     // Android 13+ (API 33+): POST_NOTIFICATIONS
     if (_sdkVersion >= 33) {
-      var notifGranted = await Permission.notification.status.isGranted;
+      var notifGranted = (await Permission.notification.status).isGranted;
       if (!notifGranted) {
         final status = await Permission.notification.request();
         notifGranted = status.isGranted;
@@ -227,20 +228,32 @@ class NotificationService {
       final notifTime = _calcNotifTime(event);
       if (notifTime == null) return null;
 
-      final tzTime = tz.TZDateTime.from(notifTime, tz.local);
-      final now = tz.TZDateTime.now(tz.local);
+      // notifTime contains calendar wall-clock fields. Reconstruct it in
+      // Hanoi rather than converting an instant from the phone's timezone.
+      final tzTime = tz.TZDateTime(
+        _hanoi,
+        notifTime.year,
+        notifTime.month,
+        notifTime.day,
+        notifTime.hour,
+        notifTime.minute,
+        notifTime.second,
+      );
+      final now = tz.TZDateTime.now(_hanoi);
+
       if (!tzTime.isAfter(now)) {
-        debugPrint('[Notif] Skip: scheduled time is not in the future: $tzTime (now: $now)');
+        debugPrint(
+          '[Notif] Skip: scheduled time is not in the future: '
+          '$tzTime (now: $now)',
+        );
         return null;
       }
 
       final permissions = await checkPermissions();
 
-      if (Platform.isAndroid) {
-        if (!permissions['notification']!) {
-          debugPrint('[Notif] ❌ POST_NOTIFICATIONS is not granted');
-          return null;
-        }
+      if (Platform.isAndroid && !permissions['notification']!) {
+        debugPrint('[Notif] ❌ POST_NOTIFICATIONS is not granted');
+        return null;
       }
 
       final isHoliday = event.type == EventType.holiday ||
@@ -284,15 +297,18 @@ class NotificationService {
       // Thay thế thông báo cũ của cùng event
       await _plugin.cancel(notifId);
 
-      // Sử dụng exactAllowWhileIdle nếu có quyền, fallback inexactAllowWhileIdle nếu chưa cấp quyền
+      // Exact alarm is preferred for calendar reminders. If Android rejects
+      // an exact alarm at runtime, keep a delivery path by falling back to
+      // inexactAllowWhileIdle. The fallback is NOT used merely because the
+      // permission check was skipped.
       final canExact = permissions['exactAlarm'] ?? false;
-      final mode = canExact
+      var mode = canExact
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
 
       debugPrint(
         '[Notif] Scheduling "${event.title}" '
-        'id=$notifId -> $tzTime ($mode, Asia/Ho_Chi_Minh)',
+        'id=$notifId -> $tzTime ($mode, $_hanoiZone)',
       );
 
       try {
@@ -308,14 +324,23 @@ class NotificationService {
           payload: event.id,
         );
       } catch (scheduleErr) {
-        debugPrint('[Notif] exact zonedSchedule failed ($scheduleErr), falling back to inexact...');
+        if (mode != AndroidScheduleMode.exactAllowWhileIdle) {
+          rethrow;
+        }
+
+        debugPrint(
+          '[Notif] exact zonedSchedule failed ($scheduleErr); '
+          'retrying inexactAllowWhileIdle',
+        );
+        mode = AndroidScheduleMode.inexactAllowWhileIdle;
+
         await _plugin.zonedSchedule(
           notifId,
           event.title,
           body,
           tzTime,
           details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: mode,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: event.id,
@@ -444,10 +469,8 @@ class NotificationService {
           : AndroidScheduleMode.inexactAllowWhileIdle;
       debugPrint('[Notif] Test schedule mode: $mode');
       
-      final testTime = tz.TZDateTime.from(
-        DateTime.now().add(const Duration(seconds: 5)),
-        tz.local,
-      );
+      final testTime =
+          tz.TZDateTime.now(_hanoi).add(const Duration(seconds: 5));
       debugPrint('[Notif] Test time: $testTime');
 
       const androidDetails = AndroidNotificationDetails(
@@ -486,24 +509,15 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
         );
         debugPrint('[Notif] ✅ Test 5s scheduled successfully: mode=$mode time=$testTime');
-      } catch (e1) {
-        debugPrint('[Notif] Test zonedSchedule failed ($e1), using fallback timer...');
-        Future.delayed(const Duration(seconds: 5), () {
-          showInstantNotification(
-            title: '🔔 Lịch Việt – Test 5 giây thành công!',
-            body: 'Hệ thống thông báo hoạt động chính xác trên màn hình!',
-          );
-        });
+      } catch (e1, stack1) {
+        debugPrint('[Notif] ❌ Test zonedSchedule failed: $e1');
+        debugPrint('[Notif] $stack1');
+        rethrow;
       }
     } catch (e, stackTrace) {
       debugPrint('[Notif] ❌ Error in scheduleTestIn5Seconds: $e');
       debugPrint('[Notif] Stack trace: $stackTrace');
-      Future.delayed(const Duration(seconds: 5), () {
-        showInstantNotification(
-          title: '🔔 Lịch Việt – Test 5 giây thành công!',
-          body: 'Hệ thống thông báo hoạt động chính xác trên màn hình!',
-        );
-      });
+      rethrow;
     }
   }
 
@@ -513,15 +527,15 @@ class NotificationService {
     final d = event.date;
     final minsBefore = event.notificationMinutesBefore ?? 30;
 
-    final now = tz.TZDateTime.now(tz.local);
-    final today = tz.TZDateTime(tz.local, now.year, now.month, now.day);
-    final eventDay = tz.TZDateTime(tz.local, d.year, d.month, d.day);
+    final now = tz.TZDateTime.now(_hanoi);
+    final today = tz.TZDateTime(_hanoi, now.year, now.month, now.day);
+    final eventDay = tz.TZDateTime(_hanoi, d.year, d.month, d.day);
 
     if (eventDay.isBefore(today)) return null;
 
     if (event.startTime != null) {
       final startDt = tz.TZDateTime(
-        tz.local,
+        _hanoi,
         d.year,
         d.month,
         d.day,

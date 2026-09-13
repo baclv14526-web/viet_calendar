@@ -292,7 +292,9 @@ class CalendarBloc extends Bloc<CalendarBlocEvent, CalendarState> {
     try {
       await _db.updateEvent(event.event);
       await _notifications.cancelEventNotification(event.event.id);
-      await _notifications.scheduleEventNotification(event.event);
+      if (event.event.hasNotification) {
+        await _notifications.scheduleEventNotification(event.event);
+      }
       _invalidateMonth(event.event.date.year, event.event.date.month);
       add(LoadCalendarEvents(state.focusedMonth));
     } catch (e) {

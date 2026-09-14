@@ -1,14 +1,15 @@
 # Flutter local notifications - keep tất cả classes
 -keep class com.dexterous.** { *; }
+-keepclassmembers class com.dexterous.** { *; }
 -dontwarn com.dexterous.**
 
-# SQFLite
--keep class io.flutter.plugins.** { *; }
-
-# Keep model classes
--keep class com.viet.lichviet.** { *; }
-
-# Keep Gson serialization
+# Keep Gson serialization for NotificationDetails
+-keep class com.google.gson.** { *; }
+-keepclassmembers class com.google.gson.** { *; }
+-keep class * extends com.google.gson.TypeAdapter
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
 -keepattributes Signature
 -keepattributes *Annotation*
 -keep class sun.misc.Unsafe { *; }

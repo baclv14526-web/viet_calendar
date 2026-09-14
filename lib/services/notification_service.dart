@@ -9,11 +9,6 @@ import 'dart:io';
 import '../models/calendar_event.dart';
 import '../utils/vietnamese_holidays.dart';
 
-@pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse r) {
-  debugPrint('[Notif] BG tapped: ${r.payload}');
-}
-
 class NotificationService {
   static final NotificationService _instance =
       NotificationService._internal();
@@ -33,7 +28,7 @@ class NotificationService {
   static const String _defaultTimeZone = 'Asia/Ho_Chi_Minh';
   static const String _eventChannelId = 'viet_calendar_reminders_v4';
   static const String _holidayChannelId = 'viet_calendar_holidays_v4';
-  static const String _smallIcon = '@drawable/ic_stat_calendar';
+  static const String _smallIcon = 'ic_stat_calendar';
 
   bool get isOppoOrRealme => _isOppoOrRealme;
 
@@ -74,7 +69,7 @@ class NotificationService {
       debugPrint('[Notif] Timezone init warning: $e');
     }
 
-    // Icon thông báo đơn sắc chuẩn Android (@drawable/ic_stat_calendar)
+    // Icon thông báo đơn sắc chuẩn Android (ic_stat_calendar)
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings(_smallIcon),
       iOS: DarwinInitializationSettings(
@@ -88,7 +83,6 @@ class NotificationService {
       await _plugin.initialize(
         initSettings,
         onDidReceiveNotificationResponse: _onTapped,
-        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } catch (e) {
       debugPrint('[Notif] Plugin initialize error: $e');
@@ -499,31 +493,17 @@ class NotificationService {
         debugPrint('[Notif] ✅ Test 5s zonedSchedule created: mode=$mode time=$testTime');
       } catch (e1) {
         debugPrint('[Notif] ⚠️ zonedSchedule fallback: $e1');
-        try {
-          await _plugin.zonedSchedule(
-            888888,
-            '🔔 Lịch Việt – Test 5 giây thành công!',
-            'Thông báo hẹn giờ đang hoạt động chính xác trên màn hình!',
-            testTime,
-            details,
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-          );
-        } catch (_) {}
+        await _plugin.zonedSchedule(
+          888888,
+          '🔔 Lịch Việt – Test 5 giây thành công!',
+          'Thông báo hẹn giờ đang hoạt động chính xác trên màn hình!',
+          testTime,
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
       }
-
-      // 2. Fallback In-App Timer: Nếu app vẫn đang mở sau 5 giây, bảo đảm thông báo chắc chắn nổ ra
-      Timer(const Duration(seconds: 5), () async {
-        try {
-          await showInstantNotification(
-            title: '🔔 Lịch Việt – Test 5 giây thành công!',
-            body: 'Thông báo hẹn giờ đang hoạt động chính xác trên màn hình!',
-            color: const Color(0xFFFF9800),
-          );
-        } catch (_) {}
-      });
-
     } catch (e, stackTrace) {
       debugPrint('[Notif] ❌ Error in scheduleTestIn5Seconds: $e');
       debugPrint('[Notif] Stack trace: $stackTrace');

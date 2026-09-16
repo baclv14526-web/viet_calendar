@@ -69,17 +69,85 @@ class _ManageEventsScreenState extends State<ManageEventsScreen>
 
   // Sự kiện sắp tới (từ hôm nay trở đi)
   List<CalendarEvent> get _upcoming {
-    final today = DateTime.now();
+    final now = DateTime.now();
     return _filteredEvents
-        .where((e) => !e.date.isBefore(DateTime(today.year, today.month, today.day)))
+        .where((e) {
+          // Nếu có endTime, so sánh với endTime
+          if (e.endTime != null) {
+            final endDateTime = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+              e.endTime!.hour,
+              e.endTime!.minute,
+            );
+            return !endDateTime.isBefore(now);
+          }
+          // Nếu có startTime nhưng không có endTime, so sánh với startTime
+          if (e.startTime != null) {
+            final startDateTime = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+              e.startTime!.hour,
+              e.startTime!.minute,
+            );
+            return !startDateTime.isBefore(now);
+          }
+          // Nếu là sự kiện cả ngày, kết thúc lúc 00:00:00 ngày hôm sau
+          if (e.isAllDay) {
+            final nextDay = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+            ).add(const Duration(days: 1));
+            return !nextDay.isBefore(now);
+          }
+          // Nếu không có giờ, chỉ so sánh ngày
+          return !e.date.isBefore(DateTime(now.year, now.month, now.day));
+        })
         .toList();
   }
 
   // Sự kiện đã qua
   List<CalendarEvent> get _past {
-    final today = DateTime.now();
+    final now = DateTime.now();
     return _filteredEvents
-        .where((e) => e.date.isBefore(DateTime(today.year, today.month, today.day)))
+        .where((e) {
+          // Nếu có endTime, so sánh với endTime
+          if (e.endTime != null) {
+            final endDateTime = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+              e.endTime!.hour,
+              e.endTime!.minute,
+            );
+            return endDateTime.isBefore(now);
+          }
+          // Nếu có startTime nhưng không có endTime, so sánh với startTime
+          if (e.startTime != null) {
+            final startDateTime = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+              e.startTime!.hour,
+              e.startTime!.minute,
+            );
+            return startDateTime.isBefore(now);
+          }
+          // Nếu là sự kiện cả ngày, kết thúc lúc 00:00:00 ngày hôm sau
+          if (e.isAllDay) {
+            final nextDay = DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+            ).add(const Duration(days: 1));
+            return nextDay.isBefore(now);
+          }
+          // Nếu không có giờ, chỉ so sánh ngày
+          return e.date.isBefore(DateTime(now.year, now.month, now.day));
+        })
         .toList()
         .reversed
         .toList(); // mới nhất lên đầu

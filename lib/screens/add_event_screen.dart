@@ -462,6 +462,37 @@ class _AddEventScreenState extends State<AddEventScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_isSaving) return;
 
+    // Validate thời gian bắt đầu <= thời gian kết thúc
+    if (!_isAllDay && _startTime != null && _endTime != null) {
+      final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+      final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+      
+      if (startMinutes > endMinutes) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange),
+                SizedBox(width: 8),
+                Text('Thời gian không hợp lệ'),
+              ],
+            ),
+            content: Text(
+              'Giờ bắt đầu (${_startTime!.format(context)}) không thể lớn hơn giờ kết thúc (${_endTime!.format(context)}).\n\nVui lòng điều chỉnh lại thời gian.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
 
     final event = CalendarEvent(

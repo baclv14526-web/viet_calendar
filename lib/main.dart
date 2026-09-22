@@ -37,7 +37,6 @@ void main() async {
 
   final notificationService = NotificationService();
   await notificationService.initialize();
-  await _requestPermissions(notificationService);
 
   // IMPORTANT: events already stored in SQLite were previously only shown
   // by the calendar; they were never scheduled again after app restart.
@@ -53,11 +52,6 @@ void main() async {
   }
 
   runApp(VietCalendarApp(notificationService: notificationService));
-}
-
-Future<void> _requestPermissions(NotificationService ns) async {
-  // requestAllPermissions xử lý toàn bộ: notification + exactAlarm + battery
-  await ns.requestAllPermissions();
 }
 
 class VietCalendarApp extends StatelessWidget {

@@ -405,7 +405,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
               label: 'Hiển thị thông báo',
               granted: _perms['notification'] ?? false,
               onGrant: () async {
-                await widget.ns.requestAllPermissions();
+                await widget.ns.requestNotificationPermission();
                 _reload();
               },
               onOpenSettings: () async {
@@ -418,7 +418,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
               granted: _perms['exactAlarm'] ?? false,
               hint: 'Settings → Ứng dụng → Quyền đặc biệt → Báo thức & nhắc nhở',
               onGrant: () async {
-                await widget.ns.requestAllPermissions();
+                await widget.ns.requestExactAlarmPermission();
                 _reload();
               },
               onOpenSettings: () async {
@@ -430,7 +430,7 @@ class _NotifDiagnosticSheetState extends State<_NotifDiagnosticSheet>
               granted: _perms['battery'] ?? false,
               hint: 'Settings → Pin → Tối ưu hóa pin → Lịch Việt → Không tối ưu',
               onGrant: () async {
-                await widget.ns.requestAllPermissions();
+                await widget.ns.requestBatteryPermission();
                 _reload();
               },
               onOpenSettings: () async {

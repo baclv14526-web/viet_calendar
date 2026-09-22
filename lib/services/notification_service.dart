@@ -4,6 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:io';
 import '../models/calendar_event.dart';
@@ -135,9 +136,11 @@ class NotificationService {
   static void _onTapped(NotificationResponse r) =>
       debugPrint('[Notif] Tapped: ${r.payload}');
 
+  static const String _prefKeyBatteryOptPrompted = 'has_prompted_battery_optimization';
+
   // ─── Permissions ───────────────────────────────────────────────────────────
 
-  Future<Map<String, bool>> requestAllPermissions() async {
+  Future<Map<String, bool>> requestAllPermissions({bool forceBattery = false}) async {
     await initialize();
     final result = <String, bool>{
       'notification': true,
@@ -184,16 +187,70 @@ class NotificationService {
         result['exactAlarm'] = canExact;
       }
 
-      // Yêu cầu quyền Chạy nền / Bỏ qua tối ưu pin
-      try {
-        if (await Permission.ignoreBatteryOptimizations.isDenied) {
-          await Permission.ignoreBatteryOptimizations.request();
+      // Yêu cầu quyền Chạy nền / Bỏ qua tối ưu pin: chỉ hỏi 1 lần duy nhất sau khi cài đặt
+      var batteryGranted = await Permission.ignoreBatteryOptimizations.isGranted;
+      if (!batteryGranted) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final hasPrompted = prefs.getBool(_prefKeyBatteryOptPrompted) ?? false;
+          if (!hasPrompted || forceBattery) {
+            await prefs.setBool(_prefKeyBatteryOptPrompted, true);
+            if (await Permission.ignoreBatteryOptimizations.isDenied) {
+              final status = await Permission.ignoreBatteryOptimizations.request();
+              batteryGranted = status.isGranted;
+            }
+          }
+        } catch (e) {
+          debugPrint('[Notif] ignoreBatteryOptimizations error: $e');
         }
-      } catch (_) {}
+      }
+      result['battery'] = batteryGranted;
     }
 
     debugPrint('[Notif] Permissions requested: $result');
     return result;
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    await initialize();
+    if (!Platform.isAndroid) return true;
+    if (_sdkVersion >= 33) {
+      final ap = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      var status = await Permission.notification.request();
+      if (!status.isGranted && ap != null) {
+        return await ap.requestNotificationsPermission() ?? false;
+      }
+      return status.isGranted;
+    }
+    return true;
+  }
+
+  Future<bool> requestExactAlarmPermission() async {
+    await initialize();
+    if (!Platform.isAndroid) return true;
+    final ap = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (_sdkVersion >= 31 && ap != null) {
+      try {
+        await ap.requestExactAlarmsPermission();
+      } catch (_) {}
+      return await ap.canScheduleExactNotifications() ?? false;
+    }
+    return true;
+  }
+
+  Future<bool> requestBatteryPermission() async {
+    await initialize();
+    if (!Platform.isAndroid) return true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKeyBatteryOptPrompted, true);
+      final status = await Permission.ignoreBatteryOptimizations.request();
+      return status.isGranted;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> requestPermission() async {
@@ -224,10 +281,12 @@ class NotificationService {
     final exactAlarm = _sdkVersion < 31 ||
         (await ap?.canScheduleExactNotifications() ?? false);
 
+    final battery = await Permission.ignoreBatteryOptimizations.isGranted;
+
     return {
       'notification': notification,
       'exactAlarm': exactAlarm,
-      'battery': true,
+      'battery': battery,
     };
   }
 

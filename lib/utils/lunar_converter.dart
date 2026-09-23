@@ -190,6 +190,15 @@ class LunarConverter {
     return stems[lunarYear % 10];
   }
 
+  /// Lấy con giáp emoji
+  static String getZodiacEmoji(int lunarYear) {
+    const emojis = [
+      '🐒', '🐔', '🐶', '🐷', '🐭', '🐂',
+      '🐯', '🐱', '🐲', '🐍', '🐴', '🐐',
+    ];
+    return emojis[lunarYear % 12];
+  }
+
   /// Lấy tên đầy đủ năm âm lịch
   static String getLunarYearName(int lunarYear) {
     return '${getHeavenlyStem(lunarYear)} ${getZodiacYear(lunarYear)}';

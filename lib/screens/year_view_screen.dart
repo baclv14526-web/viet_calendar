@@ -39,8 +39,8 @@ class _YearViewScreenState extends State<YearViewScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final lunar = LunarConverter.solarToLunar(DateTime(_year, 1, 1));
-    final lunarYearName = LunarConverter.getLunarYearName(lunar.year);
+    final lunarYearName = LunarConverter.getLunarYearName(_year);
+    final zodiacEmoji = LunarConverter.getZodiacEmoji(_year);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -57,7 +57,7 @@ class _YearViewScreenState extends State<YearViewScreen> {
                   fontSize: 17, fontWeight: FontWeight.bold),
             ),
             Text(
-              '🐉 Năm $lunarYearName',
+              '$zodiacEmoji Năm $lunarYearName',
               style: const TextStyle(
                   fontSize: 11, color: Colors.white70),
             ),
